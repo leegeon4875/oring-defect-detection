@@ -89,14 +89,21 @@ def visualize_defects(image, outputs, original_size, score_threshold=0.5):
 
         detected_defects.append(label_name)
 
-        # 마스크 적용
+        # 마스크 적용 (투명도 조정 및 외곽선 강조)
         if masks is not None:
             mask = masks[idx, 0].mul(255).byte().cpu().numpy()
             mask_resized = cv2.resize(mask, (image.width, image.height))
             mask_color = np.zeros_like(np.array(image))
             for c in range(3):  # RGB 채널에 색상 적용
                 mask_color[:, :, c] = (mask_resized > 127) * np.array(Image.new('RGB', (1, 1), box_color))[0, 0, c]
-            blended = cv2.addWeighted(np.array(image), 0.8, mask_color, 0.2, 0)
+
+            # 투명도 조정 (0.4로 증가)
+            blended = cv2.addWeighted(np.array(image), 0.6, mask_color, 0.4, 0)
+
+            # 외곽선 강조
+            contours, _ = cv2.findContours(mask_resized, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+            cv2.drawContours(blended, contours, -1, (255, 255, 255), 2)  # 흰색 외곽선 추가
+
             image = Image.fromarray(blended)
             draw = ImageDraw.Draw(image)  # 다시 그리기 객체 초기화
 
@@ -148,7 +155,7 @@ if uploaded_files:
 
     # 선택한 파일의 결과 표시 (결과 이미지만 표시)
     if selected_file:
-        st.image(results[selected_file]["result"], caption=f"결함 탐지 결과 - {selected_file}", width=800)
+        st.image(results[selected_file]["result"], caption=f"결함 탐지 결과 - {selected_file}", width=600)
 
         # 결함 요약 표시
         st.subheader(f"🔍 탐지된 결함 - {selected_file}")
