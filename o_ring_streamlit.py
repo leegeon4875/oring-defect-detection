@@ -139,7 +139,6 @@ if uploaded_files:
 
         # 결과 저장
         results[uploaded_file.name] = {
-            "original": image,
             "result": result_image,
             "defects": defect_counts
         }
