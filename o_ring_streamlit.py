@@ -11,7 +11,7 @@ from collections import Counter
 # 클래스 라벨 및 색상 정의
 CLASS_LABELS = {1: "extruded", 2: "crack", 3: "cutting", 4: "side_stamped"}
 CLASS_COLORS = {1: "red", 2: "blue", 3: "green", 4: "orange"}  # 결함별 색상 지정
-BACKGROUND_COLORS = {1: "white", 2: "yellow", 3: "lightgray", 4: "cyan"}  # 가독성을 위한 배경색
+BACKGROUND_COLOR = "lightgray"  # 가독성을 위한 배경색 통일
 
 # 모델 로딩 함수
 @st.cache_resource
@@ -60,7 +60,7 @@ def transform_image(image):
 def visualize_defects(image, outputs, original_size, score_threshold=0.5):
     draw = ImageDraw.Draw(image)
     try:
-        font = ImageFont.truetype("arial.ttf", size=24)
+        font = ImageFont.truetype("arial.ttf", size=36)  # 글자 크기 1.5배~2배 확대
     except OSError:
         font = ImageFont.load_default()
 
@@ -86,7 +86,6 @@ def visualize_defects(image, outputs, original_size, score_threshold=0.5):
         label = labels[idx].item()
         label_name = CLASS_LABELS.get(label, "unknown")
         box_color = CLASS_COLORS.get(label, "red")
-        bg_color = BACKGROUND_COLORS.get(label, "white")
 
         detected_defects.append(label_name)
 
@@ -95,18 +94,18 @@ def visualize_defects(image, outputs, original_size, score_threshold=0.5):
             mask = masks[idx, 0].mul(255).byte().cpu().numpy()
             mask_resized = cv2.resize(mask, (image.width, image.height))
             mask_color = np.zeros_like(np.array(image))
-            mask_color[:, :, 0] = (mask_resized > 127) * 255  # 빨간색 마스크 표시
+            mask_color[:, :, 1] = (mask_resized > 127) * 255  # 초록색 마스크 표시
             blended = cv2.addWeighted(np.array(image), 0.8, mask_color, 0.2, 0)
             image = Image.fromarray(blended)
             draw = ImageDraw.Draw(image)  # 다시 그리기 객체 초기화
 
-        draw.rectangle(box, outline=box_color, width=2)
+        draw.rectangle(box, outline=box_color, width=3)
         bbox = draw.textbbox((0, 0), label_name, font=font)
         text_width = bbox[2] - bbox[0]
         text_height = bbox[3] - bbox[1]
 
         text_background = [(box[0], box[1] - text_height - 4), (box[0] + text_width + 4, box[1])]
-        draw.rectangle(text_background, fill=bg_color)
+        draw.rectangle(text_background, fill=BACKGROUND_COLOR)
         draw.text((box[0] + 2, box[1] - text_height - 2), f"{label_name}", fill=box_color, font=font)
 
     return image, detected_defects
