@@ -94,7 +94,8 @@ def visualize_defects(image, outputs, original_size, score_threshold=0.5):
             mask = masks[idx, 0].mul(255).byte().cpu().numpy()
             mask_resized = cv2.resize(mask, (image.width, image.height))
             mask_color = np.zeros_like(np.array(image))
-            mask_color[:, :, 1] = (mask_resized > 127) * 255  # 초록색 마스크 표시
+            for c in range(3):  # RGB 채널에 색상 적용
+                mask_color[:, :, c] = (mask_resized > 127) * np.array(Image.new('RGB', (1, 1), box_color))[0, 0, c]
             blended = cv2.addWeighted(np.array(image), 0.8, mask_color, 0.2, 0)
             image = Image.fromarray(blended)
             draw = ImageDraw.Draw(image)  # 다시 그리기 객체 초기화
@@ -146,15 +147,9 @@ if uploaded_files:
     # 파일 목록 표시
     selected_file = st.sidebar.radio("이미지를 선택하세요", list(results.keys()))
 
-    # 선택한 파일의 결과 표시 (간격 추가)
+    # 선택한 파일의 결과 표시 (결과 이미지만 표시)
     if selected_file:
-        col1, spacer, col2 = st.columns([1, 0.1, 1])  # 0.1 비율로 간격 추가
-
-        with col1:
-            st.image(results[selected_file]["original"], caption=f"원본 이미지 - {selected_file}", width=600)
-
-        with col2:
-            st.image(results[selected_file]["result"], caption=f"결함 탐지 결과 - {selected_file}", width=600)
+        st.image(results[selected_file]["result"], caption=f"결함 탐지 결과 - {selected_file}", width=800)
 
         # 결함 요약 표시
         st.subheader(f"🔍 탐지된 결함 - {selected_file}")
