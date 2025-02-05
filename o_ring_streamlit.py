@@ -11,6 +11,7 @@ from collections import Counter
 # 클래스 라벨 및 색상 정의
 CLASS_LABELS = {1: "extruded", 2: "crack", 3: "cutting", 4: "side_stamped"}
 CLASS_COLORS = {1: "red", 2: "blue", 3: "green", 4: "orange"}  # 결함별 색상 지정
+BACKGROUND_COLORS = {1: "white", 2: "yellow", 3: "lightgray", 4: "cyan"}  # 가독성을 위한 배경색
 
 # 모델 로딩 함수
 @st.cache_resource
@@ -40,7 +41,7 @@ def visualize_defects(image, outputs, original_size, score_threshold=0.5):
 
     # 폰트 로드 (Arial이 없을 경우 기본 폰트로 대체)
     try:
-        font = ImageFont.truetype("arial.ttf", size=20)
+        font = ImageFont.truetype("arial.ttf", size=24)  # 글자 크기 확대
     except OSError:
         font = ImageFont.load_default()
 
@@ -67,11 +68,21 @@ def visualize_defects(image, outputs, original_size, score_threshold=0.5):
         label = labels[idx].item()
         label_name = CLASS_LABELS.get(label, "unknown")
         box_color = CLASS_COLORS.get(label, "red")  # 결함별 색상 적용
+        bg_color = BACKGROUND_COLORS.get(label, "white")  # 가독성을 위한 배경색 적용
 
         detected_defects.append(label_name)  # 탐지된 결함 저장
 
-        draw.rectangle(box, outline=box_color, width=1)  # 굵기 1로 설정
-        draw.text((box[0], box[1] - 20), f"{label_name}", fill=box_color, font=font)
+        draw.rectangle(box, outline=box_color, width=2)  # 박스 두께 증가
+
+        # 텍스트 배경 처리
+        text_size = draw.textsize(label_name, font=font)
+        text_background = [
+            (box[0], box[1] - text_size[1] - 4),
+            (box[0] + text_size[0] + 4, box[1])
+        ]
+        draw.rectangle(text_background, fill=bg_color)
+
+        draw.text((box[0] + 2, box[1] - text_size[1] - 2), f"{label_name}", fill=box_color, font=font)
 
         if masks is not None:
             mask = masks[idx, 0].cpu().numpy()
@@ -82,7 +93,7 @@ def visualize_defects(image, outputs, original_size, score_threshold=0.5):
             for contour in contours:
                 contour = contour.squeeze()
                 for i in range(len(contour) - 1):
-                    draw.line([tuple(contour[i]), tuple(contour[i + 1])], fill=box_color, width=2)  # 색상 적용
+                    draw.line([tuple(contour[i]), tuple(contour[i + 1])], fill=box_color, width=2)
 
     return image, detected_defects
 
