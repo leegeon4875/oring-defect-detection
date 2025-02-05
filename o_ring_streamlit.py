@@ -37,7 +37,12 @@ def transform_image(image):
 # 결함 시각화 함수
 def visualize_defects(image, outputs, original_size, score_threshold=0.5):
     draw = ImageDraw.Draw(image)
-    font = ImageFont.truetype("arial.ttf", size=20)  # 글자 크기 20으로 설정
+
+    # 폰트 로드 (Arial이 없을 경우 기본 폰트로 대체)
+    try:
+        font = ImageFont.truetype("arial.ttf", size=20)
+    except OSError:
+        font = ImageFont.load_default()
 
     boxes = outputs[0]['boxes']
     labels = outputs[0]['labels']
