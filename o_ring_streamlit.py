@@ -50,7 +50,7 @@ def transform_image(image):
     original_size = cropped_image.size
 
     transform = T.Compose([
-        T.Resize((256, 256)),  # 모델 입력 크기
+        T.Resize((500, 500)),  # 모델 입력 크기를 500x500으로 확대
         T.ToTensor()
     ])
 
@@ -72,8 +72,8 @@ def visualize_defects(image, outputs, original_size, score_threshold=0.5):
     detected_defects = []
 
     # 스케일 비율 계산
-    scale_x = image.width / 256
-    scale_y = image.height / 256
+    scale_x = image.width / 500  # 스케일 조정 (500 기준)
+    scale_y = image.height / 500
 
     for idx in range(len(boxes)):
         score = scores[idx].item()
@@ -142,10 +142,10 @@ if uploaded_files:
         col1, col2 = st.columns(2)
 
         with col1:
-            st.image(results[selected_file]["original"], caption=f"원본 이미지 - {selected_file}", use_container_width=True)
+            st.image(results[selected_file]["original"], caption=f"원본 이미지 - {selected_file}", width=600)  # 이미지 크기 확대
 
         with col2:
-            st.image(results[selected_file]["result"], caption=f"결함 탐지 결과 - {selected_file}", use_container_width=True)
+            st.image(results[selected_file]["result"], caption=f"결함 탐지 결과 - {selected_file}", width=600)  # 이미지 크기 확대
 
         # 결함 요약 표시
         st.subheader(f"🔍 탐지된 결함 - {selected_file}")
