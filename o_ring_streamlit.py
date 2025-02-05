@@ -74,15 +74,17 @@ def visualize_defects(image, outputs, original_size, score_threshold=0.5):
 
         draw.rectangle(box, outline=box_color, width=2)  # 박스 두께 증가
 
-        # 텍스트 배경 처리
-        text_size = draw.textsize(label_name, font=font)
+        # 텍스트 크기 계산 및 배경 처리
+        bbox = draw.textbbox((0, 0), label_name, font=font)
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
+
         text_background = [
-            (box[0], box[1] - text_size[1] - 4),
-            (box[0] + text_size[0] + 4, box[1])
+            (box[0], box[1] - text_height - 4),
+            (box[0] + text_width + 4, box[1])
         ]
         draw.rectangle(text_background, fill=bg_color)
-
-        draw.text((box[0] + 2, box[1] - text_size[1] - 2), f"{label_name}", fill=box_color, font=font)
+        draw.text((box[0] + 2, box[1] - text_height - 2), f"{label_name}", fill=box_color, font=font)
 
         if masks is not None:
             mask = masks[idx, 0].cpu().numpy()
