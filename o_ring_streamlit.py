@@ -56,7 +56,7 @@ def transform_image(image):
 
     return transform(cropped_image).unsqueeze(0), original_size
 
-# 결함 시각화 함수
+# 결함 시각화 함수 (마스킹 추가)
 def visualize_defects(image, outputs, original_size, score_threshold=0.5):
     draw = ImageDraw.Draw(image)
     try:
@@ -67,12 +67,12 @@ def visualize_defects(image, outputs, original_size, score_threshold=0.5):
     boxes = outputs[0]['boxes']
     labels = outputs[0]['labels']
     scores = outputs[0]['scores']
-    masks = outputs[0].get('masks')
+    masks = outputs[0].get('masks')  # 마스크 정보 가져오기
 
     detected_defects = []
 
     # 스케일 비율 계산
-    scale_x = image.width / 500  # 스케일 조정 (500 기준)
+    scale_x = image.width / 500
     scale_y = image.height / 500
 
     for idx in range(len(boxes)):
@@ -89,6 +89,16 @@ def visualize_defects(image, outputs, original_size, score_threshold=0.5):
         bg_color = BACKGROUND_COLORS.get(label, "white")
 
         detected_defects.append(label_name)
+
+        # 마스크 적용
+        if masks is not None:
+            mask = masks[idx, 0].mul(255).byte().cpu().numpy()
+            mask_resized = cv2.resize(mask, (image.width, image.height))
+            mask_color = np.zeros_like(np.array(image))
+            mask_color[:, :, 0] = (mask_resized > 127) * 255  # 빨간색 마스크 표시
+            blended = cv2.addWeighted(np.array(image), 0.8, mask_color, 0.2, 0)
+            image = Image.fromarray(blended)
+            draw = ImageDraw.Draw(image)  # 다시 그리기 객체 초기화
 
         draw.rectangle(box, outline=box_color, width=2)
         bbox = draw.textbbox((0, 0), label_name, font=font)
@@ -137,15 +147,15 @@ if uploaded_files:
     # 파일 목록 표시
     selected_file = st.sidebar.radio("이미지를 선택하세요", list(results.keys()))
 
-    # 선택한 파일의 결과 표시
+    # 선택한 파일의 결과 표시 (간격 추가)
     if selected_file:
-        col1, col2 = st.columns(2)
+        col1, spacer, col2 = st.columns([1, 0.1, 1])  # 0.1 비율로 간격 추가
 
         with col1:
-            st.image(results[selected_file]["original"], caption=f"원본 이미지 - {selected_file}", width=600)  # 이미지 크기 확대
+            st.image(results[selected_file]["original"], caption=f"원본 이미지 - {selected_file}", width=600)
 
         with col2:
-            st.image(results[selected_file]["result"], caption=f"결함 탐지 결과 - {selected_file}", width=600)  # 이미지 크기 확대
+            st.image(results[selected_file]["result"], caption=f"결함 탐지 결과 - {selected_file}", width=600)
 
         # 결함 요약 표시
         st.subheader(f"🔍 탐지된 결함 - {selected_file}")
