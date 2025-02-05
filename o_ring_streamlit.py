@@ -47,12 +47,14 @@ def transform_image(image):
     else:
         cropped_image = image
 
+    original_size = cropped_image.size
+
     transform = T.Compose([
-        T.Resize((500, 500)),  # 이미지 크기를 500x500으로 조정
+        T.Resize((256, 256)),  # 모델 입력 크기
         T.ToTensor()
     ])
 
-    return transform(cropped_image).unsqueeze(0), cropped_image.size
+    return transform(cropped_image).unsqueeze(0), original_size
 
 # 결함 시각화 함수
 def visualize_defects(image, outputs, original_size, score_threshold=0.5):
@@ -70,7 +72,7 @@ def visualize_defects(image, outputs, original_size, score_threshold=0.5):
     detected_defects = []
 
     # 스케일 비율 계산
-    scale_x = image.width / 256  # 전처리 시 256에서 500으로 리사이즈했으므로 스케일 조정
+    scale_x = image.width / 256
     scale_y = image.height / 256
 
     for idx in range(len(boxes)):
@@ -79,7 +81,7 @@ def visualize_defects(image, outputs, original_size, score_threshold=0.5):
             continue
 
         box = boxes[idx].tolist()
-        box = [box[0] * scale_x, box[1] * scale_y, box[2] * scale_x, box[3] * scale_y]  # 스케일 조정
+        box = [box[0] * scale_x, box[1] * scale_y, box[2] * scale_x, box[3] * scale_y]  # 정확한 스케일링 적용
 
         label = labels[idx].item()
         label_name = CLASS_LABELS.get(label, "unknown")
