@@ -48,7 +48,7 @@ def transform_image(image):
         cropped_image = image
 
     transform = T.Compose([
-        T.Resize((256, 256)),
+        T.Resize((500, 500)),  # 이미지 크기를 500x500으로 조정
         T.ToTensor()
     ])
 
@@ -69,12 +69,18 @@ def visualize_defects(image, outputs, original_size, score_threshold=0.5):
 
     detected_defects = []
 
+    # 스케일 비율 계산
+    scale_x = image.width / 256  # 전처리 시 256에서 500으로 리사이즈했으므로 스케일 조정
+    scale_y = image.height / 256
+
     for idx in range(len(boxes)):
         score = scores[idx].item()
         if score < score_threshold:
             continue
 
         box = boxes[idx].tolist()
+        box = [box[0] * scale_x, box[1] * scale_y, box[2] * scale_x, box[3] * scale_y]  # 스케일 조정
+
         label = labels[idx].item()
         label_name = CLASS_LABELS.get(label, "unknown")
         box_color = CLASS_COLORS.get(label, "red")
@@ -134,10 +140,10 @@ if uploaded_files:
         col1, col2 = st.columns(2)
 
         with col1:
-            st.image(results[selected_file]["original"], caption=f"원본 이미지 - {selected_file}", use_column_width=True)
+            st.image(results[selected_file]["original"], caption=f"원본 이미지 - {selected_file}", use_container_width=True)
 
         with col2:
-            st.image(results[selected_file]["result"], caption=f"결함 탐지 결과 - {selected_file}", use_column_width=True)
+            st.image(results[selected_file]["result"], caption=f"결함 탐지 결과 - {selected_file}", use_container_width=True)
 
         # 결함 요약 표시
         st.subheader(f"🔍 탐지된 결함 - {selected_file}")
