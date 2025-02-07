@@ -1,0 +1,6 @@
+[theme]
+primaryColor = "#583f3f"
+backgroundColor = "#ffffff"  # 기본 배경 색 추가
+secondaryBackgroundColor = "#c9d9f7"
+textColor = "#2c3faf"
+font = "sans serif"  # 폰트 설정 추가 가능

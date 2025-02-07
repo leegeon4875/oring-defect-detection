@@ -1,0 +1,11 @@
+# Python 캐시 및 불필요한 파일
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+
+# 환경 설정 및 가상 환경 폴더 무시
+.env
+.vscode/
+.idea/
+*.log
