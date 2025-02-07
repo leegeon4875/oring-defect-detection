@@ -3,6 +3,7 @@ import torch
 import cv2
 import numpy as np
 from torchvision import transforms
+import torchvision.transforms.functional as F
 from PIL import Image
 import torchvision.models as models
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
@@ -60,24 +61,14 @@ class DefectDetector:
 
     @staticmethod
     def predict(image, model):
-        # ✅ PIL.Image가 아닐 경우 변환
+        # ✅ PIL.Image 변환 & `RGB` 강제 변환
         if isinstance(image, np.ndarray):
             image = Image.fromarray(image)
-
-        # ✅ RGBA 또는 P 모드는 RGB로 변환
         if image.mode in ["RGBA", "P", "L"]:
             image = image.convert("RGB")
 
-        # ✅ `numpy` 변환 후 데이터 형태 확인
-        image_np = np.array(image)
-
-        # ✅ 만약 채널 차원이 없는 경우 (흑백 이미지 처리)
-        if len(image_np.shape) == 2:
-            image_np = np.stack([image_np] * 3, axis=-1)  # ✅ 채널 추가 (H, W) → (H, W, 3)
-
-        # ✅ numpy → Tensor 변환 (ToTensor() 없이 변환)
-        image_tensor = torch.from_numpy(image_np).permute(2, 0, 1).float() / 255.0
-        image_tensor = image_tensor.unsqueeze(0)
+        # ✅ `transforms.functional.to_tensor()` 활용하여 안전한 변환
+        image_tensor = F.to_tensor(image).unsqueeze(0)
 
         # ✅ 모델 예측 실행
         with torch.no_grad():
@@ -96,7 +87,6 @@ class DefectDetector:
             return image, 0, [], []
 
         return boxes[selected], labels[selected], masks[selected]
-
 
 # ✅ 시각화 클래스
 class Visualizer:
