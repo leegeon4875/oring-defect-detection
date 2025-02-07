@@ -60,7 +60,17 @@ class DefectDetector:
 
     @staticmethod
     def predict(image, model):
+        # ✅ PIL 이미지가 아닐 경우 변환
+        if isinstance(image, np.ndarray):
+            image = Image.fromarray(image)
+
+        # ✅ RGBA, P 모드는 RGB로 변환
+        if image.mode in ["RGBA", "P"]:
+            image = image.convert("RGB")
+
+        # ✅ PyTorch 텐서 변환
         image_tensor = transforms.ToTensor()(image).unsqueeze(0)
+
         with torch.no_grad():
             outputs = model(image_tensor)
 
@@ -109,8 +119,7 @@ mask_alpha = st.sidebar.slider("마스킹 투명도", 0.1, 1.0, 0.5) if mask_dis
 line_thickness = st.sidebar.slider("경계선 두께", 1, 5, 2) if mask_display == "경계선만 표시" else 2
 
 model_option = st.sidebar.selectbox("사용할 모델 선택", list(MODEL_PATHS.keys()))
-if st.sidebar.button("모델 변경 적용"):
-    model = DefectDetector.load_model(MODEL_PATHS[model_option])
+model = DefectDetector.load_model(MODEL_PATHS[model_option])  # 즉시 반영
 
 uploaded_files = st.sidebar.file_uploader("O-Ring 이미지 업로드 (다중 가능)", accept_multiple_files=True, type=["png", "jpg", "jpeg"])
 
