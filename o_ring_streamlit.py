@@ -60,17 +60,17 @@ class DefectDetector:
 
     @staticmethod
     def predict(image, model):
-        # ✅ PIL 이미지가 아닐 경우 변환
+        # ✅ PIL 이미지 변환 & `RGB` 강제 변환
         if isinstance(image, np.ndarray):
             image = Image.fromarray(image)
-
-        # ✅ RGBA, P 모드는 RGB로 변환
         if image.mode in ["RGBA", "P"]:
             image = image.convert("RGB")
 
-        # ✅ PyTorch 텐서 변환
-        image_tensor = transforms.ToTensor()(image).unsqueeze(0)
+        # ✅ `numpy → Tensor` 변환 (ToTensor() 없이 변환)
+        image_tensor = torch.from_numpy(np.array(image)).permute(2, 0, 1).float() / 255.0
+        image_tensor = image_tensor.unsqueeze(0)
 
+        # ✅ 모델 예측 실행
         with torch.no_grad():
             outputs = model(image_tensor)
 
@@ -79,6 +79,7 @@ class DefectDetector:
         labels = outputs[0]['labels'].detach().numpy()
         masks = outputs[0]['masks'].detach().squeeze().numpy()
 
+        # ✅ 예측 결과 필터링
         threshold = 0.5
         selected = scores >= threshold
 
@@ -119,7 +120,7 @@ mask_alpha = st.sidebar.slider("마스킹 투명도", 0.1, 1.0, 0.5) if mask_dis
 line_thickness = st.sidebar.slider("경계선 두께", 1, 5, 2) if mask_display == "경계선만 표시" else 2
 
 model_option = st.sidebar.selectbox("사용할 모델 선택", list(MODEL_PATHS.keys()))
-model = DefectDetector.load_model(MODEL_PATHS[model_option])  # 즉시 반영
+model = DefectDetector.load_model(MODEL_PATHS[model_option])
 
 uploaded_files = st.sidebar.file_uploader("O-Ring 이미지 업로드 (다중 가능)", accept_multiple_files=True, type=["png", "jpg", "jpeg"])
 
@@ -128,22 +129,11 @@ if uploaded_files:
     
     file_dict = {file.name: file for file in uploaded_files}
     
-    if batch_processing:
-        for file_name, file in file_dict.items():
-            image = Image.open(file).convert("RGB")
-            processed_image = ImageProcessor.remove_background(np.array(image))
-            processed_pil = Image.fromarray(cv2.cvtColor(processed_image, cv2.COLOR_BGR2RGB))
+    for file_name, file in file_dict.items() if batch_processing else [list(file_dict.items())[0]]:
+        image = Image.open(file).convert("RGB")
+        processed_image = ImageProcessor.remove_background(np.array(image))
+        processed_pil = Image.fromarray(cv2.cvtColor(processed_image, cv2.COLOR_BGR2RGB))
 
-            boxes, labels, masks = DefectDetector.predict(processed_pil, model)
-            result_image = Visualizer.visualize(processed_pil, boxes, labels, masks, mask_display, mask_alpha, line_thickness)
-            st.image(result_image, caption=f"결과: {file_name}", use_container_width=True)
-    else:
-        selected_file = st.sidebar.selectbox("분석할 이미지 선택", file_dict.keys())
-        if selected_file:
-            image = Image.open(file_dict[selected_file]).convert("RGB")
-            processed_image = ImageProcessor.remove_background(np.array(image))
-            processed_pil = Image.fromarray(cv2.cvtColor(processed_image, cv2.COLOR_BGR2RGB))
-
-            boxes, labels, masks = DefectDetector.predict(processed_pil, model)
-            result_image = Visualizer.visualize(processed_pil, boxes, labels, masks, mask_display, mask_alpha, line_thickness)
-            st.image(result_image, caption="결함 탐지 결과", use_container_width=True)
+        boxes, labels, masks = DefectDetector.predict(processed_pil, model)
+        result_image = Visualizer.visualize(processed_pil, boxes, labels, masks, mask_display, mask_alpha, line_thickness)
+        st.image(result_image, caption=f"결과: {file_name}", use_container_width=True)
