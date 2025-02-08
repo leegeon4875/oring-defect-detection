@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 from torchvision import transforms
 import torchvision.transforms.functional as F
+from torchvision.utils import draw_bounding_boxes
 from PIL import Image
 import torchvision.models as models
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
@@ -29,23 +30,12 @@ LABEL_COLORS = {
 # ✅ 배경 제거 클래스
 class ImageProcessor:
     @staticmethod
-    def remove_background(image):
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        _, binary = cv2.threshold(gray, 50, 255, cv2.THRESH_BINARY_INV)
-        contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-        if not contours:
-            return image
-
-        contour = max(contours, key=cv2.contourArea)
-        x, y, w, h = cv2.boundingRect(contour)
-        margin = 20
-        height, width = image.shape[:2]
-        x_new, y_new = max(0, x - margin), max(0, y - margin)
-        x_end, y_end = min(width, x + w + margin), min(height, y + h + margin)
-
-        cropped = image[y_new:y_end, x_new:x_end]
-        return cropped if cropped.size > 0 else image
+    def preprocess_image(image):
+        """이미지 전처리: RGB 변환 및 크기 조정"""
+        if image.mode in ["RGBA", "P", "L"]:
+            image = image.convert("RGB")
+        image = image.resize((500, 500))  # ✅ 모델에 맞게 크기 조정
+        return image
 
 # ✅ 모델 로드 및 예측 클래스
 class DefectDetector:
@@ -61,13 +51,7 @@ class DefectDetector:
 
     @staticmethod
     def predict(image, model):
-        # ✅ PIL.Image 변환 & `RGB` 강제 변환
-        if isinstance(image, np.ndarray):
-            image = Image.fromarray(image)
-        if image.mode in ["RGBA", "P", "L"]:
-            image = image.convert("RGB")
-
-        # ✅ `transforms.functional.to_tensor()` 활용하여 안전한 변환
+        # ✅ 이미지 변환 (PIL → Tensor)
         image_tensor = F.to_tensor(image).unsqueeze(0)
 
         # ✅ 모델 예측 실행
@@ -79,7 +63,7 @@ class DefectDetector:
         labels = outputs[0]['labels'].detach().numpy()
         masks = outputs[0]['masks'].detach().squeeze().numpy()
 
-        # ✅ 예측 결과 필터링
+        # ✅ 예측 결과 필터링 (신뢰도 0.5 이상만)
         threshold = 0.5
         selected = scores >= threshold
 
@@ -93,7 +77,6 @@ class Visualizer:
     @staticmethod
     def visualize(image, boxes, labels, masks, mask_display, mask_alpha, line_thickness):
         image_np = np.array(image)
-        output = image_np.copy()
 
         if mask_display == "마스킹 영역 표시":
             mask = np.zeros_like(image_np, dtype=np.uint8)
@@ -103,11 +86,13 @@ class Visualizer:
                 mask[m > 0] = color
             output = cv2.addWeighted(image_np, 1 - mask_alpha, mask, mask_alpha, 0)
         else:
-            for i, m in enumerate(masks):
-                m = (m > 0.5).astype(np.uint8)
-                contours, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                color = LABEL_COLORS.get(int(labels[i]), (255, 255, 255))
-                cv2.drawContours(output, contours, -1, color, line_thickness)
+            output = draw_bounding_boxes(
+                torch.tensor(image_np).permute(2, 0, 1),
+                torch.tensor(boxes),
+                labels=[CLASS_NAMES.get(int(l), "unknown") for l in labels],
+                colors=[LABEL_COLORS.get(int(l), (255, 255, 255)) for l in labels],
+                width=line_thickness,
+            ).permute(1, 2, 0).numpy()
 
         return Image.fromarray(output)
 
@@ -126,14 +111,13 @@ uploaded_files = st.sidebar.file_uploader("O-Ring 이미지 업로드 (다중 �
 
 if uploaded_files:
     batch_processing = st.sidebar.checkbox("전체 분석 실행")
-    
+
     file_dict = {file.name: file for file in uploaded_files}
-    
+
     for file_name, file in file_dict.items() if batch_processing else [list(file_dict.items())[0]]:
         image = Image.open(file).convert("RGB")
-        processed_image = ImageProcessor.remove_background(np.array(image))
-        processed_pil = Image.fromarray(cv2.cvtColor(processed_image, cv2.COLOR_BGR2RGB))
+        processed_image = ImageProcessor.preprocess_image(image)
 
-        boxes, labels, masks = DefectDetector.predict(processed_pil, model)
-        result_image = Visualizer.visualize(processed_pil, boxes, labels, masks, mask_display, mask_alpha, line_thickness)
+        boxes, labels, masks = DefectDetector.predict(processed_image, model)
+        result_image = Visualizer.visualize(processed_image, boxes, labels, masks, mask_display, mask_alpha, line_thickness)
         st.image(result_image, caption=f"결과: {file_name}", use_container_width=True)
