@@ -1,15 +1,11 @@
 import streamlit as st
 import torch
-import numpy as np  # ✅ numpy 임포트
-
-# ✅ numpy 버전 출력 (디버깅용)
-st.write(f"📌 numpy 버전: {np.__version__}")
-
-import cv2
-from PIL import Image
+import numpy as np
 import torchvision.transforms.functional as F
+from PIL import Image
 import torchvision.models as models
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
+from torchvision.utils import draw_bounding_boxes  # ✅ 추가됨!
 
 # ✅ 모델 경로 설정
 MODEL_PATHS = {
