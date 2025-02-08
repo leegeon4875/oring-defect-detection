@@ -88,6 +88,10 @@ class DefectDetector:
             labels = outputs[0]['labels'].detach().numpy()
             masks = outputs[0]['masks'].detach().squeeze().numpy()
 
+            # ✅ 마스크 데이터 확인 로그
+            print(f"📌 마스크 데이터 크기: {masks.shape}")
+            print(f"📌 마스크 최대값: {masks.max()}, 최소값: {masks.min()}")
+
             # ✅ 예측 결과 필터링 (신뢰도 0.5 이상만)
             threshold = 0.5
             selected = np.where(scores >= threshold)[0]
@@ -100,7 +104,8 @@ class DefectDetector:
 
         except Exception as e:
             st.error(f"❌ 예측 중 오류 발생: {str(e)}")
-            return [], [], []  # ✅ 오류 발생 시에도 빈 리스트 반환
+            return [], [], []
+
 
 # ✅ 시각화 클래스 추가
 class Visualizer:
