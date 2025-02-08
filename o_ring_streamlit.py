@@ -144,13 +144,17 @@ class Visualizer:
 # ✅ UI 구성
 st.title("O-Ring Defect Detection")
 
-st.sidebar.header("설정")
-model_option = st.sidebar.selectbox("사용할 모델 선택", list(MODEL_PATHS.keys()))
-mask_display = st.sidebar.radio("마스킹 표시 옵션", ["마스킹 영역 표시", "경계선만 표시"])
-mask_alpha = st.sidebar.slider("마스킹 투명도", 0.1, 0.6, 0.3, step=0.05) if mask_display == "마스킹 영역 표시" else 0.5
-line_thickness = int(st.sidebar.slider("바운딩 박스 두께", 1.0, 3.0, 1.5, step=0.5))
-contour_thickness = int(st.sidebar.slider("경계선 두께", 1.0, 3.0, 1.5, step=0.5)) if mask_display == "경계선만 표시" else 2  
-uploaded_files = st.sidebar.file_uploader("O-Ring 이미지 업로드 (다중 가능)", accept_multiple_files=True, type=["png", "jpg", "jpeg"])
+# ✅ 슬라이드바에는 '결과를 확인할 이미지 선택'만 배치
+st.sidebar.header("이미지 선택")
+selected_file = st.sidebar.selectbox("결과를 확인할 이미지 선택", [file.name for file in uploaded_files])
+
+# ✅ 메인 화면으로 UI 옵션 이동
+st.header("설정")
+model_option = st.selectbox("사용할 모델 선택", list(MODEL_PATHS.keys()))
+mask_display = st.radio("마스킹 표시 옵션", ["마스킹 영역 표시", "경계선만 표시"])
+mask_alpha = st.slider("마스킹 투명도", 0.1, 0.6, 0.3, step=0.05) if mask_display == "마스킹 영역 표시" else 0.5
+line_thickness = int(st.slider("바운딩 박스 두께", 1.0, 3.0, 1.5, step=0.5))
+contour_thickness = int(st.slider("경계선 두께", 1.0, 3.0, 1.5, step=0.5)) if mask_display == "경계선만 표시" else 2  
 
 if uploaded_files:
     selected_file = st.sidebar.selectbox("결과를 확인할 이미지 선택", [file.name for file in uploaded_files])
