@@ -137,7 +137,6 @@ class Visualizer:
             output = draw_bounding_boxes(
                 torch.tensor(output).permute(2, 0, 1),
                 boxes_tensor,
-                labels=labels_list,
                 colors=colors_list,
                 width=line_thickness,
             ).permute(1, 2, 0).numpy()
