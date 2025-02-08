@@ -26,14 +26,30 @@ LABEL_COLORS = {
     "side_stamped": (255, 165, 0)
 }
 
+# ✅ 전처리: 배경 제거 함수
+def remove_background(image):
+    """배경 제거를 위한 전처리"""
+    gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+    _, thresh = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY_INV)
+    kernel = np.ones((5,5), np.uint8)
+    mask = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
+    
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if contours:
+        x, y, w, h = cv2.boundingRect(np.concatenate(contours))
+        image = image[y:y+h, x:x+w]  # 배경 제거 후 관심 영역만 크롭
+    return image
+
 # ✅ 이미지 전처리 클래스
 class ImageProcessor:
     @staticmethod
     def preprocess_image(image):
-        """이미지 전처리: RGB 변환 및 크기 조정"""
+        """이미지 전처리: RGB 변환, 크기 조정 및 배경 제거"""
         if image.mode in ["RGBA", "P", "L"]:
             image = image.convert("RGB")
-        image = image.resize((500, 500))  # ✅ 모델에 맞게 크기 조정
+        image_np = np.array(image)
+        image_np = remove_background(image_np)  # ✅ 배경 제거 적용
+        image = Image.fromarray(image_np).resize((500, 500))  # 모델 입력 크기 맞춤
         return image
 
 # ✅ 모델 로드 및 예측 클래스
@@ -65,7 +81,7 @@ class DefectDetector:
 
             # ✅ 예측 결과 필터링 (신뢰도 0.5 이상만)
             threshold = 0.5
-            selected = np.where(scores >= threshold)[0]  # ✅ 인덱스 변환 수정
+            selected = np.where(scores >= threshold)[0]
 
             if len(selected) == 0:
                 return image, 0, [], []
@@ -76,34 +92,25 @@ class DefectDetector:
             st.error(f"❌ 예측 중 오류 발생: {str(e)}")
             return None, 0, [], []
 
-# ✅ 시각화 클래스 (마스킹 오류 해결 + 경계선 강조 추가)
+# ✅ 시각화 클래스
 class Visualizer:
     @staticmethod
     def visualize(image, boxes, labels, masks, mask_display, mask_alpha, line_thickness):
         image_np = np.array(image)
 
         if mask_display == "마스킹 영역 표시":
-            if len(masks) == 0:
-                st.warning("⚠️ 탐지된 결함이 없습니다.")
-                return Image.fromarray(image_np)
-
             mask = np.zeros_like(image_np, dtype=np.uint8)
             for i, m in enumerate(masks):
                 m = (m > 0.5).astype(np.uint8) * 255
                 color = LABEL_COLORS.get(int(labels[i]), (255, 255, 255))
                 mask[m > 0] = color
 
-            # ✅ 마스킹을 원본 이미지와 동일한 3채널로 변환
             if len(mask.shape) == 2 or mask.shape[-1] == 1:
                 mask = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
 
             output = cv2.addWeighted(image_np, 1 - mask_alpha, mask, mask_alpha, 0)
 
         else:
-            if len(boxes) == 0:
-                st.warning("⚠️ 탐지된 결함이 없습니다.")
-                return Image.fromarray(image_np)
-
             boxes_tensor = torch.tensor(boxes, dtype=torch.float)
             labels_list = [CLASS_NAMES.get(int(l), "unknown") for l in labels]
             output = draw_bounding_boxes(
@@ -116,35 +123,25 @@ class Visualizer:
 
         return Image.fromarray(output)
 
-# ✅ Streamlit UI
+# ✅ UI 구성
 st.title("O-Ring Defect Detection")
 
-# ✅ 모델 선택, 마스킹 옵션은 메인 화면에서 설정
 model_option = st.selectbox("사용할 모델 선택", list(MODEL_PATHS.keys()))
 mask_display = st.radio("마스킹 표시 옵션", ["마스킹 영역 표시", "경계선만 표시"])
 mask_alpha = st.slider("마스킹 투명도", 0.1, 1.0, 0.5, step=0.1) if mask_display == "마스킹 영역 표시" else 0.5
 line_thickness = st.slider("경계선 두께", 1, 5, 2) if mask_display == "경계선만 표시" else 2
 uploaded_files = st.file_uploader("O-Ring 이미지 업로드 (다중 가능)", accept_multiple_files=True, type=["png", "jpg", "jpeg"])
 
-# ✅ 왼쪽 슬라이드바: 업로드된 이미지 목록만 표시 (검색 기능 추가)
 if uploaded_files:
-    st.sidebar.header("📂 업로드된 이미지 목록")
     selected_file = st.sidebar.selectbox("결과를 확인할 이미지 선택", [file.name for file in uploaded_files])
-
     file_dict = {file.name: file for file in uploaded_files}
     image = Image.open(file_dict[selected_file]).convert("RGB")
     processed_image = ImageProcessor.preprocess_image(image)
-    
     model = DefectDetector.load_model(MODEL_PATHS[model_option])
     boxes, labels, masks = DefectDetector.predict(processed_image, model)
     result_image = Visualizer.visualize(processed_image, boxes, labels, masks, mask_display, mask_alpha, line_thickness)
-    
     st.image(result_image, caption=f"결과: {selected_file}", use_container_width=True)
 
-    # ✅ 이미지 제목 & 결함 종류 및 개수 출력
     st.write(f"📌 **파일명:** {selected_file}")
-    if defect_count > 0:
-        defect_summary = ", ".join([f"{defect}: {defect_types.count(defect)}개" for defect in set(defect_types)])
-        st.write(f"🔹 **탐지된 결함:** {defect_summary}")
-    else:
-        st.write("✅ **정상입니다!**")
+    defect_summary = ", ".join([f"{CLASS_NAMES[int(l)]}: {list(labels).count(l)}개" for l in set(labels)]) if labels else "✅ 정상입니다!"
+    st.markdown(f'<div style="background-color: lightgray; padding: 10px; border-radius: 5px;">{defect_summary}</div>', unsafe_allow_html=True)
