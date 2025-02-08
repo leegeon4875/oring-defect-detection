@@ -82,12 +82,25 @@ class Visualizer:
         image_np = np.array(image)
 
         if mask_display == "마스킹 영역 표시":
+            if masks is None or len(masks) == 0:
+                st.warning("⚠️ 탐지된 결함이 없습니다. 마스킹을 표시할 수 없습니다.")
+                return Image.fromarray(image_np)
+
             mask = np.zeros_like(image_np, dtype=np.uint8)
+
             for i, m in enumerate(masks):
-                m = (m > 0.5).astype(np.uint8) * 255
+                m = (m > 0.5).astype(np.uint8) * 255  # ✅ 이진화 및 uint8 변환
                 color = LABEL_COLORS.get(int(labels[i]), (255, 255, 255))
                 mask[m > 0] = color
+
+            # ✅ 마스킹 오류 수정 (uint8 변환)
+            mask = mask.astype(np.uint8)
+
+            # ✅ OpenCV 연산 수행 전에 데이터 확인
+            st.write(f"📌 mask shape: {mask.shape}, dtype: {mask.dtype}")
+            
             output = cv2.addWeighted(image_np, 1 - mask_alpha, mask, mask_alpha, 0)
+        
         else:
             if len(boxes) == 0:
                 st.warning("⚠️ 탐지된 결함이 없습니다.")
