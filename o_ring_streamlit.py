@@ -96,9 +96,6 @@ class Visualizer:
             # ✅ 마스킹 오류 수정 (uint8 변환)
             mask = mask.astype(np.uint8)
 
-            # ✅ OpenCV 연산 수행 전에 데이터 확인
-            st.write(f"📌 mask shape: {mask.shape}, dtype: {mask.dtype}")
-            
             output = cv2.addWeighted(image_np, 1 - mask_alpha, mask, mask_alpha, 0)
         
         else:
@@ -123,7 +120,7 @@ st.title("O-Ring Defect Detection")
 st.sidebar.header("설정")
 
 mask_display = st.sidebar.radio("마스킹 표시 옵션", ["마스킹 영역 표시", "경계선만 표시"])
-mask_alpha = st.sidebar.slider("마스킹 투명도", 0.1, 1.0, 0.5) if mask_display == "마스킹 영역 표시" else 0.5
+mask_alpha = st.sidebar.slider("마스킹 투명도", 0.1, 1.0, 0.5, step=0.1) if mask_display == "마스킹 영역 표시" else 0.5
 line_thickness = st.sidebar.slider("경계선 두께", 1, 5, 2) if mask_display == "경계선만 표시" else 2
 
 model_option = st.sidebar.selectbox("사용할 모델 선택", list(MODEL_PATHS.keys()))
