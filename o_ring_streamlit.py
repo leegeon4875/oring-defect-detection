@@ -161,8 +161,8 @@ st.title("O-Ring Defect Detection")
 model_option = st.selectbox("사용할 모델 선택", list(MODEL_PATHS.keys()))
 mask_display = st.radio("마스킹 표시 옵션", ["마스킹 영역 표시", "경계선만 표시"])
 mask_alpha = st.slider("마스킹 투명도", 0.1, 0.7, 0.5, step=0.5) if mask_display == "마스킹 영역 표시" else 0.5
-line_thickness = st.slider("바운딩 박스 두께", 1, 3, 1, step=0.5)
-contour_thickness = st.slider("경계선 두께", 1, 3, 1, step=0.5) if mask_display == "경계선만 표시" else 2
+line_thickness = st.slider("바운딩 박스 두께", 1.0, 3.0, 1.5, step=0.5)
+contour_thickness = st.slider("경계선 두께", 1.0, 3.0, 1.5, step=0.5) if mask_display == "경계선만 표시" else 2.0
 
 uploaded_files = st.file_uploader("O-Ring 이미지 업로드 (다중 가능)", accept_multiple_files=True, type=["png", "jpg", "jpeg"])
 
