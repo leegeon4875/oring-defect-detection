@@ -92,14 +92,15 @@ class DefectDetector:
             threshold = 0.5
             selected = np.where(scores >= threshold)[0]
 
+            # ✅ 결함이 없는 경우 빈 리스트 반환 (오류 방지)
             if len(selected) == 0:
-                return image, [], [], []
+                return [], [], []
 
             return boxes[selected], labels[selected], masks[selected]
 
         except Exception as e:
             st.error(f"❌ 예측 중 오류 발생: {str(e)}")
-            return None, [], [], []
+            return [], [], []  # ✅ 오류 발생 시에도 빈 리스트 반환
 
 # ✅ 시각화 클래스 추가
 class Visualizer:
@@ -131,13 +132,27 @@ class Visualizer:
         if len(boxes) > 0:
             boxes_tensor = torch.tensor(boxes, dtype=torch.float)
             labels_list = [CLASS_NAMES.get(int(l), "unknown") for l in labels]
+            colors_list = [LABEL_COLORS.get(CLASS_NAMES[int(l)], (255, 255, 255)) for l in labels]
+
             output = draw_bounding_boxes(
                 torch.tensor(output).permute(2, 0, 1),
                 boxes_tensor,
                 labels=labels_list,
-                colors=[LABEL_COLORS.get(CLASS_NAMES[int(l)], (255, 255, 255)) for l in labels],
+                colors=colors_list,
                 width=line_thickness,
             ).permute(1, 2, 0).numpy()
+
+            # ✅ 바운딩 박스 위에 글자 배경 추가
+            for i, (box, label) in enumerate(zip(boxes, labels_list)):
+                x1, y1 = int(box[0]), int(box[1])  # 왼쪽 상단 좌표
+
+                # ✅ 배경 사각형 (글자 크기 맞추기 위해 조정)
+                text_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)[0]
+                text_w, text_h = text_size
+                cv2.rectangle(output, (x1, y1 - text_h - 4), (x1 + text_w + 4, y1), (50, 50, 50), -1)  # ✅ 배경 박스 추가
+
+                # ✅ 글자 추가
+                cv2.putText(output, label, (x1 + 2, y1 - 2), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
 
         return Image.fromarray(output)
     
@@ -160,12 +175,15 @@ if uploaded_files:
     model = DefectDetector.load_model(MODEL_PATHS[model_option])
     boxes, labels, masks = DefectDetector.predict(processed_image, model)
     
-    # ✅ 시각화 결과 적용
-    result_image = Visualizer.visualize(processed_image, boxes, labels, masks, mask_display, mask_alpha, line_thickness, contour_thickness)
+    # ✅ 정상 이미지 처리 추가
+    if len(boxes) == 0:
+        st.image(processed_image, caption=f"✅ 정상 이미지: {selected_file}", use_container_width=True)
+        st.write("✅ **정상입니다! 결함이 탐지되지 않았습니다.**")
+    else:
+        # ✅ 시각화 결과 적용
+        result_image = Visualizer.visualize(processed_image, boxes, labels, masks, mask_display, mask_alpha, line_thickness, contour_thickness)
+        st.image(result_image, caption=f"결과: {selected_file}", use_container_width=True)
     
-    # ✅ 최종 이미지 출력
-    st.image(result_image, caption=f"결과: {selected_file}", use_container_width=True)
-
     # ✅ 결함 정보 표시 (아이콘 추가 + `lightgray` 배경)
     st.write(f"📌 **파일명:** {selected_file}")
     if len(labels) > 0:
