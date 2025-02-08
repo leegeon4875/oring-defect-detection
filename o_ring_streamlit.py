@@ -76,7 +76,7 @@ class DefectDetector:
             st.error(f"❌ 예측 중 오류 발생: {str(e)}")
             return None, 0, [], []
 
-# ✅ 시각화 클래스
+# ✅ 시각화 클래스 (마스킹 오류 해결 + 경계선 강조 추가)
 class Visualizer:
     @staticmethod
     def visualize(image, boxes, labels, masks, mask_display, mask_alpha, line_thickness):
@@ -93,8 +93,9 @@ class Visualizer:
                 color = LABEL_COLORS.get(int(labels[i]), (255, 255, 255))
                 mask[m > 0] = color
 
-            # ✅ 마스킹을 3채널(RGB)로 변환하여 `cv2.addWeighted()` 오류 해결
-            mask = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+            # ✅ 마스킹을 원본 이미지와 동일한 3채널로 변환
+            if len(mask.shape) == 2 or mask.shape[-1] == 1:
+                mask = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
 
             output = cv2.addWeighted(image_np, 1 - mask_alpha, mask, mask_alpha, 0)
 
@@ -142,9 +143,8 @@ if uploaded_files:
 
     # ✅ 이미지 제목 & 결함 종류 및 개수 출력
     st.write(f"📌 **파일명:** {selected_file}")
-    if len(labels) > 0:
-        defect_counts = {CLASS_NAMES[int(l)]: list(labels).count(l) for l in set(labels)}
-        st.write(f"🛠 **탐지된 결함 종류 및 개수:**")
-        st.table(defect_counts)
+    if defect_count > 0:
+        defect_summary = ", ".join([f"{defect}: {defect_types.count(defect)}개" for defect in set(defect_types)])
+        st.write(f"🔹 **탐지된 결함:** {defect_summary}")
     else:
         st.write("✅ **정상입니다!**")
