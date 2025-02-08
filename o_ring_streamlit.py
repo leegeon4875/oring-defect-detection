@@ -43,12 +43,10 @@ def remove_background(image_np):
 
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if contours:
-        try:
-            x, y, w, h = cv2.boundingRect(np.concatenate(contours))
-            image_np = image_np[y:y+h, x:x+w]  # 배경을 제거한 관심 영역
-        except ValueError:
-            pass  # contours가 비어 있을 경우 오류 방지
+        x, y, w, h = cv2.boundingRect(np.vstack(contours))  # ✅ np.concatenate 대신 np.vstack 사용
+        image_np = image_np[y:y+h, x:x+w]  # 배경을 제거한 관심 영역
     return image_np
+
 
 # ✅ 이미지 전처리 클래스 (배경 제거 포함)
 class ImageProcessor:
@@ -130,7 +128,7 @@ class Visualizer:
                 cv2.drawContours(output, contours, -1, color, contour_thickness)  # ✅ 경계선 두께 조절 가능
 
         # ✅ 바운딩 박스 & 결함 종류 추가 (마스킹 & 경계선 옵션 모두 포함)
-        labels_list = [CLASS_NAMES.get(int(l), "unknown") for l in labels]
+        labels_list = [CLASS_NAMES[int(l)] for l in labels]
         colors_list = [LABEL_COLORS.get(CLASS_NAMES[int(l)], (255, 255, 255)) for l in labels]
 
         output = draw_bounding_boxes(
@@ -140,7 +138,6 @@ class Visualizer:
             colors=colors_list,  # ✅ 최적화된 colors_list 사용
             width=line_thickness,
         ).permute(1, 2, 0).numpy()
-
 
         return Image.fromarray(output)
 
