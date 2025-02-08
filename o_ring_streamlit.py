@@ -51,26 +51,48 @@ class DefectDetector:
 
     @staticmethod
     def predict(image, model):
-        # ✅ 이미지 변환 (PIL → Tensor)
-        image_tensor = F.to_tensor(image).unsqueeze(0)
+        try:
+            # ✅ `numpy.ndarray` 형식이면 `PIL.Image`로 변환
+            if isinstance(image, np.ndarray):
+                image = Image.fromarray(image)
 
-        # ✅ 모델 예측 실행
-        with torch.no_grad():
-            outputs = model(image_tensor)
+            # ✅ `L`, `P`, `RGBA` 등 모든 비표준 모드는 `RGB`로 변환
+            if not isinstance(image, Image.Image):
+                st.error("❌ 입력된 이미지가 올바르지 않습니다.")
+                return None, 0, [], []
 
-        scores = outputs[0]['scores'].detach().numpy()
-        boxes = outputs[0]['boxes'].detach().numpy()
-        labels = outputs[0]['labels'].detach().numpy()
-        masks = outputs[0]['masks'].detach().squeeze().numpy()
+            if image.mode != "RGB":
+                image = image.convert("RGB")
 
-        # ✅ 예측 결과 필터링 (신뢰도 0.5 이상만)
-        threshold = 0.5
-        selected = scores >= threshold
+            # ✅ 안전한 변환 방식 적용 (예외 처리 추가)
+            try:
+                image_tensor = F.to_tensor(image).unsqueeze(0)
+            except Exception as e:
+                st.error(f"❌ 이미지 변환 중 오류 발생: {str(e)}")
+                return None, 0, [], []
 
-        if not np.any(selected) or len(boxes) == 0:
-            return image, 0, [], []
+            # ✅ 모델 예측 실행
+            with torch.no_grad():
+                outputs = model(image_tensor)
 
-        return boxes[selected], labels[selected], masks[selected]
+            scores = outputs[0]['scores'].detach().numpy()
+            boxes = outputs[0]['boxes'].detach().numpy()
+            labels = outputs[0]['labels'].detach().numpy()
+            masks = outputs[0]['masks'].detach().squeeze().numpy()
+
+            # ✅ 예측 결과 필터링
+            threshold = 0.5
+            selected = scores >= threshold
+
+            if not np.any(selected) or len(boxes) == 0:
+                return image, 0, [], []
+
+            return boxes[selected], labels[selected], masks[selected]
+
+        except Exception as e:
+            st.error(f"❌ 예측 중 오류 발생: {str(e)}")
+            return None, 0, [], []
+
 
 # ✅ 시각화 클래스
 class Visualizer:
