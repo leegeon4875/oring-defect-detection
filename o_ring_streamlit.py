@@ -52,23 +52,20 @@ class DefectDetector:
     @staticmethod
     def predict(image, model):
         try:
-            # ✅ `numpy.ndarray` 형식이면 `PIL.Image`로 변환
-            if isinstance(image, np.ndarray):
-                image = Image.fromarray(image)
+            # ✅ 이미지 타입 및 정보 출력
+            st.write(f"📌 **이미지 타입:** {type(image)}")
+            st.write(f"📌 **PIL 모드:** {image.mode}")
 
-            # ✅ `L`, `P`, `RGBA` 등 모든 비표준 모드는 `RGB`로 변환
-            if not isinstance(image, Image.Image):
-                st.error("❌ 입력된 이미지가 올바르지 않습니다.")
-                return None, 0, [], []
+            # ✅ numpy 변환 확인
+            image_np = np.array(image)
+            st.write(f"📌 **numpy 변환 완료:** {image_np.shape}, dtype={image_np.dtype}")
 
-            if image.mode != "RGB":
-                image = image.convert("RGB")
-
-            # ✅ 안전한 변환 방식 적용 (예외 처리 추가)
+            # ✅ Tensor 변환 시도 (오류 발생 여부 확인)
             try:
                 image_tensor = F.to_tensor(image).unsqueeze(0)
+                st.write("✅ `to_tensor()` 변환 성공!")
             except Exception as e:
-                st.error(f"❌ 이미지 변환 중 오류 발생: {str(e)}")
+                st.error(f"❌ `to_tensor()` 변환 중 오류 발생: {str(e)}")
                 return None, 0, [], []
 
             # ✅ 모델 예측 실행
@@ -92,7 +89,6 @@ class DefectDetector:
         except Exception as e:
             st.error(f"❌ 예측 중 오류 발생: {str(e)}")
             return None, 0, [], []
-
 
 # ✅ 시각화 클래스
 class Visualizer:
