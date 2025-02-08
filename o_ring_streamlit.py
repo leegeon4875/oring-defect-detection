@@ -88,10 +88,6 @@ class DefectDetector:
             labels = outputs[0]['labels'].detach().numpy()
             masks = outputs[0]['masks'].detach().squeeze().numpy()
 
-            # ✅ 마스크 데이터 확인 로그
-            print(f"📌 마스크 데이터 크기: {masks.shape}")
-            print(f"📌 마스크 최대값: {masks.max()}, 최소값: {masks.min()}")
-
             # ✅ 예측 결과 필터링 (신뢰도 0.5 이상만)
             threshold = 0.5
             selected = np.where(scores >= threshold)[0]
@@ -104,8 +100,7 @@ class DefectDetector:
 
         except Exception as e:
             st.error(f"❌ 예측 중 오류 발생: {str(e)}")
-            return [], [], []
-
+            return [], [], []  # ✅ 오류 발생 시에도 빈 리스트 반환
 
 # ✅ 시각화 클래스 추가
 class Visualizer:
@@ -166,9 +161,7 @@ st.title("O-Ring Defect Detection")
 model_option = st.selectbox("사용할 모델 선택", list(MODEL_PATHS.keys()))
 mask_display = st.radio("마스킹 표시 옵션", ["마스킹 영역 표시", "경계선만 표시"])
 mask_alpha = st.slider("마스킹 투명도", 0.1, 0.7, 0.1, step=0.1) if mask_display == "마스킹 영역 표시" else 0.5
-# ✅ 바운딩 박스 두께: 1.0 ~ 3.0 (단위 0.5)
-line_thickness = int(st.slider("바운딩 박스 두께", 1.0, 3.0, 1.5, step=0.5))
-# ✅ 경계선 두께: 1.0 ~ 3.0 (단위 0.5)
+line_thickness = int(st.slider("바운딩 박스 두께", 1.0, 3.0, 1.5, step=0.5))  
 contour_thickness = int(st.slider("경계선 두께", 1.0, 3.0, 1.5, step=0.5)) if mask_display == "경계선만 표시" else 2
 
 uploaded_files = st.file_uploader("O-Ring 이미지 업로드 (다중 가능)", accept_multiple_files=True, type=["png", "jpg", "jpeg"])
@@ -202,3 +195,5 @@ if uploaded_files:
         st.markdown(defect_summary, unsafe_allow_html=True)
     else:
         st.write("✅ **정상입니다**")
+
+# 완벽한 모델
