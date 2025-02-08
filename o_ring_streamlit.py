@@ -100,7 +100,47 @@ class DefectDetector:
         except Exception as e:
             st.error(f"❌ 예측 중 오류 발생: {str(e)}")
             return None, [], [], []
+# ✅ 시각화 클래스
+class Visualizer:
+    @staticmethod
+    def visualize(image, boxes, labels, masks, mask_display, mask_alpha, line_thickness, contour_thickness):
+        image_np = np.array(image)
 
+        if mask_display == "마스킹 영역 표시":
+            mask = np.zeros_like(image_np, dtype=np.uint8)
+            for i, m in enumerate(masks):
+                m = (m > 0.5).astype(np.uint8) * 255
+                color = LABEL_COLORS.get(CLASS_NAMES[int(labels[i])], (255, 255, 255))
+                mask[m > 0] = color
+
+            if len(mask.shape) == 2 or mask.shape[-1] == 1:
+                mask = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+
+            output = cv2.addWeighted(image_np, 1 - mask_alpha, mask, mask_alpha, 0)
+
+        else:
+            # ✅ 경계선만 표시 (바운딩 박스 두께와 독립적으로 조절 가능)
+            output = image_np.copy()
+            for i, m in enumerate(masks):
+                m = (m > 0.5).astype(np.uint8)
+                contours, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                color = LABEL_COLORS.get(CLASS_NAMES[int(labels[i])], (255, 255, 255))
+                cv2.drawContours(output, contours, -1, color, contour_thickness)  # ✅ 경계선 두께 조절 가능
+
+        # ✅ 바운딩 박스 & 결함 종류 추가 (마스킹 & 경계선 옵션 모두 포함)
+        labels_list = [CLASS_NAMES[int(l)] for l in labels]
+        colors_list = [LABEL_COLORS.get(CLASS_NAMES[int(l)], (255, 255, 255)) for l in labels]
+
+        output = draw_bounding_boxes(
+            torch.tensor(output).permute(2, 0, 1),
+            boxes_tensor,
+            labels=labels_list,
+            colors=colors_list,  # ✅ 최적화된 colors_list 사용
+            width=line_thickness,
+        ).permute(1, 2, 0).numpy()
+
+        return Image.fromarray(output)
+    
 # ✅ UI 구성
 st.title("O-Ring Defect Detection")
 
