@@ -26,30 +26,14 @@ LABEL_COLORS = {
     "side_stamped": (255, 165, 0)
 }
 
-# ✅ 전처리: 배경 제거 함수
-def remove_background(image):
-    """배경 제거를 위한 전처리"""
-    gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
-    _, thresh = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY_INV)
-    kernel = np.ones((5,5), np.uint8)
-    mask = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
-    
-    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    if contours:
-        x, y, w, h = cv2.boundingRect(np.concatenate(contours))
-        image = image[y:y+h, x:x+w]  # 배경 제거 후 관심 영역만 크롭
-    return image
-
 # ✅ 이미지 전처리 클래스
 class ImageProcessor:
     @staticmethod
     def preprocess_image(image):
-        """이미지 전처리: RGB 변환, 크기 조정 및 배경 제거"""
+        """이미지 전처리: RGB 변환 및 크기 조정"""
         if image.mode in ["RGBA", "P", "L"]:
             image = image.convert("RGB")
-        image_np = np.array(image)
-        image_np = remove_background(image_np)  # ✅ 배경 제거 적용
-        image = Image.fromarray(image_np).resize((500, 500))  # 모델 입력 크기 맞춤
+        image = image.resize((500, 500))  # ✅ 모델에 맞게 크기 조정
         return image
 
 # ✅ 모델 로드 및 예측 클래스
@@ -84,13 +68,13 @@ class DefectDetector:
             selected = np.where(scores >= threshold)[0]
 
             if len(selected) == 0:
-                return image, 0, [], []
+                return image, [], [], []
 
             return boxes[selected], labels[selected], masks[selected]
 
         except Exception as e:
             st.error(f"❌ 예측 중 오류 발생: {str(e)}")
-            return None, 0, [], []
+            return None, [], [], []
 
 # ✅ 시각화 클래스
 class Visualizer:
@@ -105,16 +89,25 @@ class Visualizer:
                 color = LABEL_COLORS.get(int(labels[i]), (255, 255, 255))
                 mask[m > 0] = color
 
+            # ✅ 마스킹을 원본 이미지와 동일한 3채널로 변환
             if len(mask.shape) == 2 or mask.shape[-1] == 1:
                 mask = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
 
             output = cv2.addWeighted(image_np, 1 - mask_alpha, mask, mask_alpha, 0)
 
         else:
+            # ✅ 경계선만 표시 + 바운딩 박스 유지
+            output = image_np.copy()
+            for i, m in enumerate(masks):
+                m = (m > 0.5).astype(np.uint8)
+                contours, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                color = LABEL_COLORS.get(int(labels[i]), (255, 255, 255))
+                cv2.drawContours(output, contours, -1, color, 2)
+
             boxes_tensor = torch.tensor(boxes, dtype=torch.float)
             labels_list = [CLASS_NAMES.get(int(l), "unknown") for l in labels]
             output = draw_bounding_boxes(
-                torch.tensor(image_np).permute(2, 0, 1),
+                torch.tensor(output).permute(2, 0, 1),
                 boxes_tensor,
                 labels=labels_list,
                 colors=[LABEL_COLORS.get(int(l), (255, 255, 255)) for l in labels],
@@ -142,6 +135,9 @@ if uploaded_files:
     result_image = Visualizer.visualize(processed_image, boxes, labels, masks, mask_display, mask_alpha, line_thickness)
     st.image(result_image, caption=f"결과: {selected_file}", use_container_width=True)
 
-    st.write(f"📌 **파일명:** {selected_file}")
-    defect_summary = ", ".join([f"{CLASS_NAMES[int(l)]}: {list(labels).count(l)}개" for l in set(labels)]) if labels else "✅ 정상입니다!"
-    st.markdown(f'<div style="background-color: lightgray; padding: 10px; border-radius: 5px;">{defect_summary}</div>', unsafe_allow_html=True)
+    # ✅ 결함 정보 오류 수정 (labels가 비어있을 경우 대비)
+    if labels is not None and len(labels) > 0:
+        defect_summary = ", ".join([f"{CLASS_NAMES[int(l)]}: {list(labels).count(l)}개" for l in set(labels)])
+        st.markdown(f'<div style="background-color: lightgray; padding: 10px; border-radius: 5px;">{defect_summary}</div>', unsafe_allow_html=True)
+    else:
+        st.write("✅ **정상입니다!**")
