@@ -2,10 +2,10 @@ import streamlit as st
 import torch
 import numpy as np
 import torchvision.transforms.functional as F
+from torchvision.utils import draw_bounding_boxes
 from PIL import Image
 import torchvision.models as models
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
-from torchvision.utils import draw_bounding_boxes  # ✅ 추가됨!
 
 # ✅ 모델 경로 설정
 MODEL_PATHS = {
@@ -25,7 +25,7 @@ LABEL_COLORS = {
     "side_stamped": (255, 165, 0)
 }
 
-# ✅ 배경 제거 클래스
+# ✅ 이미지 전처리 클래스
 class ImageProcessor:
     @staticmethod
     def preprocess_image(image):
@@ -50,21 +50,8 @@ class DefectDetector:
     @staticmethod
     def predict(image, model):
         try:
-            # ✅ 이미지 타입 및 정보 출력
-            st.write(f"📌 **이미지 타입:** {type(image)}")
-            st.write(f"📌 **PIL 모드:** {image.mode}")
-
-            # ✅ numpy 변환 확인
-            image_np = np.array(image)
-            st.write(f"📌 **numpy 변환 완료:** {image_np.shape}, dtype={image_np.dtype}")
-
-            # ✅ Tensor 변환 시도 (오류 발생 여부 확인)
-            try:
-                image_tensor = F.to_tensor(image).unsqueeze(0)
-                st.write("✅ `to_tensor()` 변환 성공!")
-            except Exception as e:
-                st.error(f"❌ `to_tensor()` 변환 중 오류 발생: {str(e)}")
-                return None, 0, [], []
+            # ✅ 이미지 변환 (PIL → Tensor)
+            image_tensor = F.to_tensor(image).unsqueeze(0)
 
             # ✅ 모델 예측 실행
             with torch.no_grad():
@@ -75,7 +62,7 @@ class DefectDetector:
             labels = outputs[0]['labels'].detach().numpy()
             masks = outputs[0]['masks'].detach().squeeze().numpy()
 
-            # ✅ 예측 결과 필터링
+            # ✅ 예측 결과 필터링 (신뢰도 0.5 이상만)
             threshold = 0.5
             selected = scores >= threshold
 
@@ -102,10 +89,16 @@ class Visualizer:
                 mask[m > 0] = color
             output = cv2.addWeighted(image_np, 1 - mask_alpha, mask, mask_alpha, 0)
         else:
+            if len(boxes) == 0:
+                st.warning("⚠️ 탐지된 결함이 없습니다.")
+                return Image.fromarray(image_np)
+
+            boxes_tensor = torch.tensor(boxes, dtype=torch.float)
+            labels_list = [CLASS_NAMES.get(int(l), "unknown") for l in labels]
             output = draw_bounding_boxes(
                 torch.tensor(image_np).permute(2, 0, 1),
-                torch.tensor(boxes),
-                labels=[CLASS_NAMES.get(int(l), "unknown") for l in labels],
+                boxes_tensor,
+                labels=labels_list,
                 colors=[LABEL_COLORS.get(int(l), (255, 255, 255)) for l in labels],
                 width=line_thickness,
             ).permute(1, 2, 0).numpy()
@@ -126,14 +119,10 @@ model = DefectDetector.load_model(MODEL_PATHS[model_option])
 uploaded_files = st.sidebar.file_uploader("O-Ring 이미지 업로드 (다중 가능)", accept_multiple_files=True, type=["png", "jpg", "jpeg"])
 
 if uploaded_files:
-    batch_processing = st.sidebar.checkbox("전체 분석 실행")
-
-    file_dict = {file.name: file for file in uploaded_files}
-
-    for file_name, file in file_dict.items() if batch_processing else [list(file_dict.items())[0]]:
+    for file in uploaded_files:
         image = Image.open(file).convert("RGB")
         processed_image = ImageProcessor.preprocess_image(image)
 
         boxes, labels, masks = DefectDetector.predict(processed_image, model)
         result_image = Visualizer.visualize(processed_image, boxes, labels, masks, mask_display, mask_alpha, line_thickness)
-        st.image(result_image, caption=f"결과: {file_name}", use_container_width=True)
+        st.image(result_image, caption=f"결과: {file.name}", use_container_width=True)
