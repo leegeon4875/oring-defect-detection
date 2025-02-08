@@ -137,6 +137,7 @@ class Visualizer:
             output = draw_bounding_boxes(
                 torch.tensor(output).permute(2, 0, 1),
                 boxes_tensor,
+                labels=labels_list,
                 colors=colors_list,
                 width=line_thickness,
             ).permute(1, 2, 0).numpy()
@@ -154,15 +155,15 @@ class Visualizer:
                 cv2.putText(output, label, (x1 + 2, y1 - 2), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
 
         return Image.fromarray(output)
-    
+
 # ✅ UI 구성
 st.title("O-Ring Defect Detection")
 
 model_option = st.selectbox("사용할 모델 선택", list(MODEL_PATHS.keys()))
 mask_display = st.radio("마스킹 표시 옵션", ["마스킹 영역 표시", "경계선만 표시"])
 mask_alpha = st.slider("마스킹 투명도", 0.1, 0.7, 0.5, step=0.5) if mask_display == "마스킹 영역 표시" else 0.5
-line_thickness = st.slider("바운딩 박스 두께", 1.0, 3.0, 1.5, step=0.5)
-contour_thickness = st.slider("경계선 두께", 1.0, 3.0, 1.5, step=0.5) if mask_display == "경계선만 표시" else 2.0
+line_thickness = st.slider("바운딩 박스 두께", 1, 3, 1)
+contour_thickness = st.slider("경계선 두께", 1, 3, 1) if mask_display == "경계선만 표시" else 2
 
 uploaded_files = st.file_uploader("O-Ring 이미지 업로드 (다중 가능)", accept_multiple_files=True, type=["png", "jpg", "jpeg"])
 
@@ -173,7 +174,7 @@ if uploaded_files:
     processed_image = ImageProcessor.preprocess_image(image)  # ✅ 배경 제거 적용
     model = DefectDetector.load_model(MODEL_PATHS[model_option])
     boxes, labels, masks = DefectDetector.predict(processed_image, model)
-    
+
     # ✅ 정상 이미지 처리 추가
     if len(boxes) == 0:
         st.image(processed_image, caption=f"✅ 정상 이미지: {selected_file}", use_container_width=True)
@@ -182,7 +183,7 @@ if uploaded_files:
         # ✅ 시각화 결과 적용
         result_image = Visualizer.visualize(processed_image, boxes, labels, masks, mask_display, mask_alpha, line_thickness, contour_thickness)
         st.image(result_image, caption=f"결과: {selected_file}", use_container_width=True)
-    
+
     # ✅ 결함 정보 표시 (아이콘 추가 + `lightgray` 배경)
     st.write(f"📌 **파일명:** {selected_file}")
     if len(labels) > 0:
