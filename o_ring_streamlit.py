@@ -93,7 +93,9 @@ class Visualizer:
                 color = LABEL_COLORS.get(int(labels[i]), (255, 255, 255))
                 mask[m > 0] = color
 
-            mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)  # ✅ 마스킹 오류 해결
+            # ✅ 마스킹을 3채널(RGB)로 변환하여 `cv2.addWeighted()` 오류 해결
+            mask = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+
             output = cv2.addWeighted(image_np, 1 - mask_alpha, mask, mask_alpha, 0)
 
         else:
@@ -137,3 +139,12 @@ if uploaded_files:
     result_image = Visualizer.visualize(processed_image, boxes, labels, masks, mask_display, mask_alpha, line_thickness)
     
     st.image(result_image, caption=f"결과: {selected_file}", use_container_width=True)
+
+    # ✅ 이미지 제목 & 결함 종류 및 개수 출력
+    st.write(f"📌 **파일명:** {selected_file}")
+    if len(labels) > 0:
+        defect_counts = {CLASS_NAMES[int(l)]: list(labels).count(l) for l in set(labels)}
+        st.write(f"🛠 **탐지된 결함 종류 및 개수:**")
+        st.table(defect_counts)
+    else:
+        st.write("✅ **정상입니다!**")
