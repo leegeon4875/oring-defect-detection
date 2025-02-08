@@ -100,7 +100,8 @@ class DefectDetector:
         except Exception as e:
             st.error(f"❌ 예측 중 오류 발생: {str(e)}")
             return None, [], [], []
-# ✅ 시각화 클래스
+
+# ✅ 시각화 클래스 추가
 class Visualizer:
     @staticmethod
     def visualize(image, boxes, labels, masks, mask_display, mask_alpha, line_thickness, contour_thickness):
@@ -119,25 +120,24 @@ class Visualizer:
             output = cv2.addWeighted(image_np, 1 - mask_alpha, mask, mask_alpha, 0)
 
         else:
-            # ✅ 경계선만 표시 (바운딩 박스 두께와 독립적으로 조절 가능)
             output = image_np.copy()
             for i, m in enumerate(masks):
                 m = (m > 0.5).astype(np.uint8)
                 contours, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                 color = LABEL_COLORS.get(CLASS_NAMES[int(labels[i])], (255, 255, 255))
-                cv2.drawContours(output, contours, -1, color, contour_thickness)  # ✅ 경계선 두께 조절 가능
+                cv2.drawContours(output, contours, -1, color, contour_thickness)
 
         # ✅ 바운딩 박스 & 결함 종류 추가 (마스킹 & 경계선 옵션 모두 포함)
-        labels_list = [CLASS_NAMES[int(l)] for l in labels]
-        colors_list = [LABEL_COLORS.get(CLASS_NAMES[int(l)], (255, 255, 255)) for l in labels]
-
-        output = draw_bounding_boxes(
-            torch.tensor(output).permute(2, 0, 1),
-            boxes_tensor,
-            labels=labels_list,
-            colors=colors_list,  # ✅ 최적화된 colors_list 사용
-            width=line_thickness,
-        ).permute(1, 2, 0).numpy()
+        if len(boxes) > 0:
+            boxes_tensor = torch.tensor(boxes, dtype=torch.float)
+            labels_list = [CLASS_NAMES.get(int(l), "unknown") for l in labels]
+            output = draw_bounding_boxes(
+                torch.tensor(output).permute(2, 0, 1),
+                boxes_tensor,
+                labels=labels_list,
+                colors=[LABEL_COLORS.get(CLASS_NAMES[int(l)], (255, 255, 255)) for l in labels],
+                width=line_thickness,
+            ).permute(1, 2, 0).numpy()
 
         return Image.fromarray(output)
     
@@ -159,8 +159,12 @@ if uploaded_files:
     processed_image = ImageProcessor.preprocess_image(image)  # ✅ 배경 제거 적용
     model = DefectDetector.load_model(MODEL_PATHS[model_option])
     boxes, labels, masks = DefectDetector.predict(processed_image, model)
-
-    st.image(processed_image, caption=f"결과: {selected_file}", use_container_width=True)
+    
+    # ✅ 시각화 결과 적용
+    result_image = Visualizer.visualize(processed_image, boxes, labels, masks, mask_display, mask_alpha, line_thickness, contour_thickness)
+    
+    # ✅ 최종 이미지 출력
+    st.image(result_image, caption=f"결과: {selected_file}", use_container_width=True)
 
     # ✅ 결함 정보 표시 (아이콘 추가 + `lightgray` 배경)
     st.write(f"📌 **파일명:** {selected_file}")
