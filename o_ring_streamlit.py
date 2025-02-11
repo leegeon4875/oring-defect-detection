@@ -93,7 +93,12 @@ class DefectDetector:
             scores = outputs[0]['scores'].detach().numpy()
             boxes = outputs[0]['boxes'].detach().numpy()
             labels = outputs[0]['labels'].detach().numpy()
-            masks = outputs[0]['masks'].detach().squeeze().numpy()
+             masks = outputs[0]['masks'].detach().numpy() if "masks" in outputs[0] else None
+
+            # ✅ 디버깅용: 마스크 확인
+            print("🔍 예측된 마스크 개수:", len(masks) if masks is not None else "None")
+            if masks is not None and len(masks) > 0:
+                print("🔍 첫 번째 마스크 값 예시:\n", masks[0])
 
             # ✅ 예측 결과 필터링 (신뢰도 0.5 이상만)
             threshold = 0.5
