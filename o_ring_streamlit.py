@@ -80,38 +80,38 @@ class DefectDetector:
         model.eval()
         return model
 
-        @staticmethod
-def predict(image, model):
-    try:
-        # ✅ 이미지 변환 (PIL → Tensor)
-        image_tensor = F.to_tensor(image).unsqueeze(0)
+    @staticmethod
+    def predict(image, model):
+        try:
+            # ✅ 이미지 변환 (PIL → Tensor)
+            image_tensor = F.to_tensor(image).unsqueeze(0)
 
-        # ✅ 모델 예측 실행
-        with torch.no_grad():
-            outputs = model(image_tensor)
+            # ✅ 모델 예측 실행
+            with torch.no_grad():
+                outputs = model(image_tensor)
 
-        scores = outputs[0]['scores'].detach().numpy()
-        boxes = outputs[0]['boxes'].detach().numpy()
-        labels = outputs[0]['labels'].detach().numpy()
-        masks = outputs[0]['masks'].detach().numpy() if "masks" in outputs[0] else None
+            scores = outputs[0]['scores'].detach().numpy()
+            boxes = outputs[0]['boxes'].detach().numpy()
+            labels = outputs[0]['labels'].detach().numpy()
+            masks = outputs[0]['masks'].detach().numpy() if "masks" in outputs[0] else None
 
-        # ✅ 디버깅용: 마스크 확인
-        print("🔍 예측된 마스크 개수:", len(masks) if masks is not None else "None")
-        if masks is not None and len(masks) > 0:
-            print("🔍 첫 번째 마스크 값 예시:\n", masks[0])
+            # ✅ 디버깅용: 마스크 확인
+            print("🔍 예측된 마스크 개수:", len(masks) if masks is not None else "None")
+            if masks is not None and len(masks) > 0:
+                print("🔍 첫 번째 마스크 값 예시:\n", masks[0])
 
-        # ✅ 예측 결과 필터링 (신뢰도 0.5 이상만)
-        threshold = 0.5
-        selected = np.where(scores >= threshold)[0]
+            # ✅ 예측 결과 필터링 (신뢰도 0.5 이상만)
+            threshold = 0.5
+            selected = np.where(scores >= threshold)[0]
 
-        if len(selected) == 0:
+            if len(selected) == 0:
+                return [], [], []
+
+            return boxes[selected], labels[selected], masks[selected] if masks is not None else []
+
+        except Exception as e:
+            st.error(f"❌ 예측 중 오류 발생: {str(e)}")
             return [], [], []
-
-        return boxes[selected], labels[selected], masks[selected] if masks is not None else []
-
-    except Exception as e:
-        st.error(f"❌ 예측 중 오류 발생: {str(e)}")
-        return [], [], []
 
 # ✅ 시각화 클래스 추가
 class Visualizer:
