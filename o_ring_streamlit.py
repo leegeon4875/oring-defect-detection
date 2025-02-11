@@ -9,7 +9,6 @@ import torchvision.models as models
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 import json
 
-
 # ✅ 모델 경로 설정
 MODEL_PATHS = {
     "Baseline Model": "train_test_100.pth",
@@ -95,103 +94,85 @@ class DefectDetector:
             scores = outputs[0]['scores'].detach().numpy()
             boxes = outputs[0]['boxes'].detach().numpy()
             labels = outputs[0]['labels'].detach().numpy()
-            masks = outputs[0]['masks'].detach().numpy() if "masks" in outputs[0] else None
-
-            # ✅ 디버깅용: 마스크 확인
-            print("🔍 예측된 마스크 개수:", len(masks) if masks is not None else "None")
-            if masks is not None and len(masks) > 0:
-                print("🔍 첫 번째 마스크 값 예시:\n", masks[0])
+            masks = outputs[0]['masks'].detach().squeeze().numpy()
 
             # ✅ 예측 결과 필터링 (신뢰도 0.5 이상만)
             threshold = 0.5
             selected = np.where(scores >= threshold)[0]
 
+            # ✅ 결함이 없는 경우 빈 리스트 반환 (오류 방지)
             if len(selected) == 0:
                 return [], [], []
 
-            return boxes[selected], labels[selected], masks[selected] if masks is not None else []
+            return boxes[selected], labels[selected], masks[selected]
 
         except Exception as e:
             st.error(f"❌ 예측 중 오류 발생: {str(e)}")
-            return [], [], []
+            return [], [], []  # ✅ 오류 발생 시에도 빈 리스트 반환
 
-# ✅ 시각화 클래스 개선
+# ✅ 시각화 클래스 추가
 class Visualizer:
     @staticmethod
     def visualize(image, boxes, labels, masks, mask_display, mask_alpha, line_thickness, contour_thickness):
         image_np = np.array(image)
 
-        # ✅ 마스킹 영역 표시 모드
         if mask_display == "마스킹 영역 표시":
             mask = np.zeros_like(image_np, dtype=np.uint8)
-
             for i, m in enumerate(masks):
-                print(f"🔍 마스크 {i} 처리 전: shape={m.shape}, dtype={m.dtype}, min-max={m.min()}~{m.max()}")
-
-                # ✅ 마스크 데이터 타입 & 차원 조정
-                if len(m.shape) == 3:
-                    m = m.squeeze(0)
-                if m.dtype != np.uint8:
-                    m = (m * 255).astype(np.uint8)
-
-                # ✅ 마스크 이진화 (Threshold 조정 → 확장 방지)
-                m = (m > 0.5).astype(np.uint8) * 255  # 기존 0.4 → 0.5로 변경하여 크기 확장 방지
-
-                # ✅ 마스크 경계 다듬기 (너무 확장되지 않도록 보정)
-                kernel = np.ones((2, 2), np.uint8)  # 기존 3x3 → 2x2로 줄여서 과확장 방지
-                m = cv2.morphologyEx(m, cv2.MORPH_OPEN, kernel)  # MORPH_CLOSE 대신 MORPH_OPEN 적용 (작은 노이즈 제거)
-
-                # ✅ 컬러 변환 (단일 채널 유지)
-                if len(m.shape) == 3:
-                    m = cv2.cvtColor(m, cv2.COLOR_BGR2GRAY)
-
-                print(f"✅ 마스크 {i} 변환 후: shape={m.shape}, dtype={m.dtype}, min-max={m.min()}~{m.max()}")
-
-                # ✅ 마스크 색상 지정 후 합성
+                m = (m > 0.5).astype(np.uint8) * 255
                 color = LABEL_COLORS.get(CLASS_NAMES[int(labels[i])], (255, 255, 255))
                 mask[m > 0] = color
 
-            if len(mask.shape) == 2:
-                mask = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)  # 2D → 3채널 변환
+            if len(mask.shape) == 2 or mask.shape[-1] == 1:
+                mask = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
 
-            output = cv2.addWeighted(image_np, 1 - mask_alpha, mask, mask_alpha, 0)  # ✅ 마스킹 투명도 조정
+            output = cv2.addWeighted(image_np, 1 - mask_alpha, mask, mask_alpha, 0)
 
-        # ✅ 경계선만 표시 모드
         else:
             output = image_np.copy()
             for i, m in enumerate(masks):
-                print(f"🔍 경계선 모드 - 마스크 {i}: shape={m.shape}, dtype={m.dtype}, min-max={m.min()}~{m.max()}")
-
-                # ✅ 마스크 데이터 타입 & 차원 조정
-                if len(m.shape) == 3:
-                    m = m.squeeze(0)
-                if m.dtype != np.uint8:
-                    m = (m * 255).astype(np.uint8)
-
-                # ✅ 단일 채널 변환
-                if len(m.shape) == 3:
-                    m = cv2.cvtColor(m, cv2.COLOR_BGR2GRAY)
-
-                # ✅ 컨투어 찾기
+                m = (m > 0.5).astype(np.uint8)
                 contours, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-                # ✅ 컨투어 그리기
                 color = LABEL_COLORS.get(CLASS_NAMES[int(labels[i])], (255, 255, 255))
                 cv2.drawContours(output, contours, -1, color, contour_thickness)
 
+        # ✅ 바운딩 박스 & 결함 종류 추가 (마스킹 & 경계선 옵션 모두 포함)
+        if len(boxes) > 0:
+            boxes_tensor = torch.tensor(boxes, dtype=torch.float)
+            labels_list = [CLASS_NAMES.get(int(l), "unknown") for l in labels]
+            colors_list = [LABEL_COLORS.get(CLASS_NAMES[int(l)], (255, 255, 255)) for l in labels]
+
+            output = draw_bounding_boxes(
+                torch.tensor(output).permute(2, 0, 1),
+                boxes_tensor,
+                colors=colors_list,
+                width=line_thickness,
+            ).permute(1, 2, 0).numpy()
+
+            # ✅ 바운딩 박스 위에 글자 배경 추가
+            for i, (box, label) in enumerate(zip(boxes, labels_list)):
+                x1, y1 = int(box[0]), int(box[1])  # 왼쪽 상단 좌표
+
+                # ✅ 배경 사각형 (글자 크기 맞추기 위해 조정)
+                text_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)[0]
+                text_w, text_h = text_size
+                cv2.rectangle(output, (x1, y1 - text_h - 4), (x1 + text_w + 4, y1), (50, 50, 50), -1)  # ✅ 배경 박스 추가
+
+                # ✅ 글자 추가
+                cv2.putText(output, label, (x1 + 2, y1 - 2), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+
         return Image.fromarray(output)
 
-# ✅ JSON 데이터를 저장할 리스트 생성
+# ✅ JSON 데이터를 저장할 리스트 생성 (결과를 확인한 이미지만 저장)
 json_results = []
 
 # ✅ JSON 데이터 변환 함수 (정상 이미지도 포함)
-def add_to_json_results(file_name, boxes, labels, scores):
+def add_to_json_results(file_name, boxes, labels):
     """결과 데이터를 JSON 형식으로 변환 후 리스트에 추가"""
     results = []
     for i in range(len(labels)):
         result = {
             "class": CLASS_NAMES.get(int(labels[i]), "unknown"),
-            "confidence": float(scores[i]),  # ✅ 확률(score) 추가
             "bounding_box": [float(coord) for coord in boxes[i]]
         }
         results.append(result)
@@ -205,7 +186,7 @@ def add_to_json_results(file_name, boxes, labels, scores):
     existing_files = [item["file_name"] for item in json_results]
     if file_name not in existing_files:
         json_results.append(json_data)
-
+        
 # ✅ UI 구성
 st.title("O-Ring Defect Detection")
 model_option = st.selectbox("사용할 모델 선택", list(MODEL_PATHS.keys()))
@@ -216,7 +197,7 @@ st.info(MODEL_DESCRIPTIONS[model_option])  # 모델 설명 표시
 
 mask_display = st.radio("마스킹 표시 옵션", ["마스킹 영역 표시", "경계선만 표시"])
 mask_alpha = st.slider("마스킹 투명도", 0.1, 0.7, 0.1, step=0.1) if mask_display == "마스킹 영역 표시" else 0.5
-line_thickness = int(st.slider("바운딩 박스 두께", 1.0, 3.0, 1.5, step=0.5))  
+line_thickness = int(st.slider("바운딩 박스 두께", 1.0, 3.0, 1.5, step=0.5))
 contour_thickness = int(st.slider("경계선 두께", 1.0, 3.0, 1.5, step=0.5)) if mask_display == "경계선만 표시" else 2
 
 uploaded_files = st.file_uploader("O-Ring 이미지 업로드 (다중 가능)", accept_multiple_files=True, type=["png", "jpg", "jpeg"])
@@ -227,12 +208,10 @@ if uploaded_files:
     image = Image.open(file_dict[selected_file]).convert("RGB")
     processed_image = ImageProcessor.preprocess_image(image)  
     model = DefectDetector.load_model(MODEL_PATHS[model_option])
-    
-    # ✅ 예측 수행 (scores 값 추가)
-    boxes, labels, scores = DefectDetector.predict(processed_image, model)
+    boxes, labels, masks = DefectDetector.predict(processed_image, model)
 
     # ✅ JSON 데이터 저장 (결과가 없는 경우도 포함)
-    add_to_json_results(selected_file, boxes, labels, scores)
+    add_to_json_results(selected_file, boxes, labels)
 
     # ✅ 결과가 있을 경우 시각화
     if len(boxes) > 0:
@@ -242,7 +221,7 @@ if uploaded_files:
         st.image(processed_image, caption=f"✅ 정상 이미지: {selected_file}", use_container_width=True)
         st.write("✅ **정상입니다! 결함이 탐지되지 않았습니다.**")
 
-# ✅ JSON 저장 및 다운로드 버튼 (항상 표시되도록 변경)
+# ✅ JSON 저장 및 다운로드 버튼 추가 (JSON 데이터가 있을 때만 표시)
 if json_results:
     st.write("📥 **결과를 저장하고 다운로드할 수 있습니다.**")
     
