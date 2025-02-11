@@ -134,12 +134,12 @@ class Visualizer:
                 if m.dtype != np.uint8:
                     m = (m * 255).astype(np.uint8)
 
-                # ✅ 마스크 이진화 (Threshold 조정)
-                m = (m > 0.5).astype(np.uint8) * 255  # 기존 0.5 → 0.4로 낮춤 (너무 넓어지는 문제 방지)
+                # ✅ 마스크 이진화 (Threshold 조정 → 확장 방지)
+                m = (m > 0.5).astype(np.uint8) * 255  # 기존 0.4 → 0.5로 변경하여 크기 확장 방지
 
-                # ✅ 경계 다듬기 (Morphological Closing 적용)
-                kernel = np.ones((3, 3), np.uint8)  # 3x3 작은 커널 사용
-                m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, kernel)  # 작은 빈 공간 제거 및 경계 부드럽게
+                # ✅ 마스크 경계 다듬기 (너무 확장되지 않도록 보정)
+                kernel = np.ones((2, 2), np.uint8)  # 기존 3x3 → 2x2로 줄여서 과확장 방지
+                m = cv2.morphologyEx(m, cv2.MORPH_OPEN, kernel)  # MORPH_CLOSE 대신 MORPH_OPEN 적용 (작은 노이즈 제거)
 
                 # ✅ 컬러 변환 (단일 채널 유지)
                 if len(m.shape) == 3:
@@ -178,31 +178,6 @@ class Visualizer:
                 # ✅ 컨투어 그리기
                 color = LABEL_COLORS.get(CLASS_NAMES[int(labels[i])], (255, 255, 255))
                 cv2.drawContours(output, contours, -1, color, contour_thickness)
-
-        # ✅ 바운딩 박스 & 결함 종류 추가
-        if len(boxes) > 0:
-            boxes_tensor = torch.tensor(boxes, dtype=torch.float)
-            labels_list = [CLASS_NAMES.get(int(l), "unknown") for l in labels]
-            colors_list = [LABEL_COLORS.get(CLASS_NAMES[int(l)], (255, 255, 255)) for l in labels]
-
-            output = draw_bounding_boxes(
-                torch.tensor(output).permute(2, 0, 1),
-                boxes_tensor,
-                colors=colors_list,
-                width=line_thickness,
-            ).permute(1, 2, 0).numpy()
-
-            # ✅ 바운딩 박스 위에 텍스트 추가
-            for i, (box, label) in enumerate(zip(boxes, labels_list)):
-                x1, y1 = int(box[0]), int(box[1])
-
-                # ✅ 텍스트 배경
-                text_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)[0]
-                text_w, text_h = text_size
-                cv2.rectangle(output, (x1, y1 - text_h - 4), (x1 + text_w + 4, y1), (50, 50, 50), -1)
-
-                # ✅ 텍스트 그리기
-                cv2.putText(output, label, (x1 + 2, y1 - 2), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
 
         return Image.fromarray(output)
 
