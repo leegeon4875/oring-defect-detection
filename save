@@ -11,15 +11,8 @@ from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 # ✅ 모델 경로 설정
 MODEL_PATHS = {
     "Baseline Model": "train_test_100.pth",
-    "K-Fold Model": "k_fold_35_epoch_2.pth",
-    "Ensemble Model": "ensemble_model_35_epoch.pth"
-}
-
-# ✅ 모델 설명 가이드
-MODEL_DESCRIPTIONS = {
-    "Baseline Model": "빠른 결과가 필요하거나 기본적인 검사를 원할 때 추천합니다.",
-    "K-Fold Model": "다양한 환경에서도 안정적인 검사가 필요할 때 선택하세요.",
-    "Ensemble Model": "가장 정확한 검사가 필요한 경우 사용하세요."
+    "K-Fold Model (Epoch 35)": "k_fold_35_epoch_2.pth",
+    "Ensemble Model (Epoch 35)": "ensemble_model_35_epoch.pth"
 }
 
 # ✅ 클래스 매핑
@@ -164,12 +157,8 @@ class Visualizer:
 
 # ✅ UI 구성
 st.title("O-Ring Defect Detection")
+
 model_option = st.selectbox("사용할 모델 선택", list(MODEL_PATHS.keys()))
-
-# ✅ 선택된 모델 설명 표시
-st.write(f"📌 **선택한 모델:** {model_option}")  
-st.info(MODEL_DESCRIPTIONS[model_option])  # 모델 설명 표시
-
 mask_display = st.radio("마스킹 표시 옵션", ["마스킹 영역 표시", "경계선만 표시"])
 mask_alpha = st.slider("마스킹 투명도", 0.1, 0.7, 0.1, step=0.1) if mask_display == "마스킹 영역 표시" else 0.5
 line_thickness = int(st.slider("바운딩 박스 두께", 1.0, 3.0, 1.5, step=0.5))  
