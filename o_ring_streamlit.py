@@ -113,33 +113,64 @@ class DefectDetector:
             st.error(f"❌ 예측 중 오류 발생: {str(e)}")
             return [], [], []
 
-# ✅ 시각화 클래스 추가
+# ✅ 시각화 클래스 개선
 class Visualizer:
     @staticmethod
     def visualize(image, boxes, labels, masks, mask_display, mask_alpha, line_thickness, contour_thickness):
         image_np = np.array(image)
 
+        # ✅ 마스킹 영역 표시 모드
         if mask_display == "마스킹 영역 표시":
             mask = np.zeros_like(image_np, dtype=np.uint8)
+
             for i, m in enumerate(masks):
-                m = (m > 0.5).astype(np.uint8) * 255
+                print(f"🔍 마스크 {i} 처리 전: shape={m.shape}, dtype={m.dtype}, min-max={m.min()}~{m.max()}")
+
+                # ✅ 마스크 데이터 타입 & 차원 조정
+                if len(m.shape) == 3:
+                    m = m.squeeze(0)  # (1, H, W) → (H, W)
+                if m.dtype != np.uint8:
+                    m = (m * 255).astype(np.uint8)  # float(0~1) → uint8(0~255)
+
+                # ✅ 컬러 변환 (단일 채널 유지)
+                if len(m.shape) == 3:
+                    m = cv2.cvtColor(m, cv2.COLOR_BGR2GRAY)
+
+                print(f"✅ 마스크 {i} 변환 후: shape={m.shape}, dtype={m.dtype}, min-max={m.min()}~{m.max()}")
+
+                # ✅ 마스크 색상 지정 후 합성
                 color = LABEL_COLORS.get(CLASS_NAMES[int(labels[i])], (255, 255, 255))
                 mask[m > 0] = color
 
-            if len(mask.shape) == 2 or mask.shape[-1] == 1:
-                mask = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+            if len(mask.shape) == 2:
+                mask = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)  # 2D → 3채널 변환
 
             output = cv2.addWeighted(image_np, 1 - mask_alpha, mask, mask_alpha, 0)
 
+        # ✅ 경계선만 표시 모드
         else:
             output = image_np.copy()
             for i, m in enumerate(masks):
-                m = (m > 0.5).astype(np.uint8)
+                print(f"🔍 경계선 모드 - 마스크 {i}: shape={m.shape}, dtype={m.dtype}, min-max={m.min()}~{m.max()}")
+
+                # ✅ 마스크 데이터 타입 & 차원 조정
+                if len(m.shape) == 3:
+                    m = m.squeeze(0)
+                if m.dtype != np.uint8:
+                    m = (m * 255).astype(np.uint8)
+
+                # ✅ 단일 채널 변환
+                if len(m.shape) == 3:
+                    m = cv2.cvtColor(m, cv2.COLOR_BGR2GRAY)
+
+                # ✅ 컨투어 찾기
                 contours, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+                # ✅ 컨투어 그리기
                 color = LABEL_COLORS.get(CLASS_NAMES[int(labels[i])], (255, 255, 255))
                 cv2.drawContours(output, contours, -1, color, contour_thickness)
 
-        # ✅ 바운딩 박스 & 결함 종류 추가 (마스킹 & 경계선 옵션 모두 포함)
+        # ✅ 바운딩 박스 & 결함 종류 추가
         if len(boxes) > 0:
             boxes_tensor = torch.tensor(boxes, dtype=torch.float)
             labels_list = [CLASS_NAMES.get(int(l), "unknown") for l in labels]
@@ -152,19 +183,20 @@ class Visualizer:
                 width=line_thickness,
             ).permute(1, 2, 0).numpy()
 
-            # ✅ 바운딩 박스 위에 글자 배경 추가
+            # ✅ 바운딩 박스 위에 텍스트 추가
             for i, (box, label) in enumerate(zip(boxes, labels_list)):
-                x1, y1 = int(box[0]), int(box[1])  # 왼쪽 상단 좌표
+                x1, y1 = int(box[0]), int(box[1])
 
-                # ✅ 배경 사각형 (글자 크기 맞추기 위해 조정)
+                # ✅ 텍스트 배경
                 text_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)[0]
                 text_w, text_h = text_size
-                cv2.rectangle(output, (x1, y1 - text_h - 4), (x1 + text_w + 4, y1), (50, 50, 50), -1)  # ✅ 배경 박스 추가
+                cv2.rectangle(output, (x1, y1 - text_h - 4), (x1 + text_w + 4, y1), (50, 50, 50), -1)
 
-                # ✅ 글자 추가
+                # ✅ 텍스트 그리기
                 cv2.putText(output, label, (x1 + 2, y1 - 2), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
 
         return Image.fromarray(output)
+
 
 # ✅ UI 구성
 st.title("O-Ring Defect Detection")
