@@ -128,9 +128,16 @@ class Visualizer:
 
                 # ✅ 마스크 데이터 타입 & 차원 조정
                 if len(m.shape) == 3:
-                    m = m.squeeze(0)  # (1, H, W) → (H, W)
+                    m = m.squeeze(0)
                 if m.dtype != np.uint8:
-                    m = (m * 255).astype(np.uint8)  # float(0~1) → uint8(0~255)
+                    m = (m * 255).astype(np.uint8)
+
+                # ✅ 마스크 이진화 (Threshold 조정)
+                m = (m > 0.4).astype(np.uint8) * 255  # 기존 0.5 → 0.4로 낮춤 (너무 넓어지는 문제 방지)
+
+                # ✅ 경계 다듬기 (Morphological Closing 적용)
+                kernel = np.ones((3, 3), np.uint8)  # 3x3 작은 커널 사용
+                m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, kernel)  # 작은 빈 공간 제거 및 경계 부드럽게
 
                 # ✅ 컬러 변환 (단일 채널 유지)
                 if len(m.shape) == 3:
@@ -145,7 +152,7 @@ class Visualizer:
             if len(mask.shape) == 2:
                 mask = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)  # 2D → 3채널 변환
 
-            output = cv2.addWeighted(image_np, 1 - mask_alpha, mask, mask_alpha, 0)
+            output = cv2.addWeighted(image_np, 1 - mask_alpha, mask, mask_alpha, 0)  # ✅ 마스킹 투명도 조정
 
         # ✅ 경계선만 표시 모드
         else:
