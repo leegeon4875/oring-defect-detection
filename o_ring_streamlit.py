@@ -7,6 +7,8 @@ from torchvision.utils import draw_bounding_boxes
 from PIL import Image
 import torchvision.models as models
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
+import json
+
 
 # ✅ 모델 경로 설정
 MODEL_PATHS = {
@@ -204,7 +206,31 @@ class Visualizer:
 
         return Image.fromarray(output)
 
+# ✅ JSON 데이터를 저장할 리스트 생성 (결과를 확인한 이미지만 저장)
+json_results = []
 
+# ✅ JSON 데이터 변환 함수 (결과 확인된 이미지만 저장)
+def add_to_json_results(file_name, boxes, labels, scores):
+    """결과 데이터를 JSON 형식으로 변환 후 리스트에 추가"""
+    results = []
+    for i in range(len(labels)):
+        result = {
+            "class": CLASS_NAMES.get(int(labels[i]), "unknown"),
+            "confidence": float(scores[i]),  
+            "bounding_box": [float(coord) for coord in boxes[i]]  
+        }
+        results.append(result)
+
+    json_data = {
+        "file_name": file_name,
+        "detections": results
+    }
+
+    # ✅ 중복 저장 방지 (이미 존재하는 파일은 업데이트)
+    existing_files = [item["file_name"] for item in json_results]
+    if file_name not in existing_files:
+        json_results.append(json_data)
+        
 # ✅ UI 구성
 st.title("O-Ring Defect Detection")
 model_option = st.selectbox("사용할 모델 선택", list(MODEL_PATHS.keys()))
@@ -224,30 +250,36 @@ if uploaded_files:
     selected_file = st.sidebar.selectbox("결과를 확인할 이미지 선택", [file.name for file in uploaded_files])
     file_dict = {file.name: file for file in uploaded_files}
     image = Image.open(file_dict[selected_file]).convert("RGB")
-    processed_image = ImageProcessor.preprocess_image(image)  # ✅ 배경 제거 적용
+    processed_image = ImageProcessor.preprocess_image(image)  
     model = DefectDetector.load_model(MODEL_PATHS[model_option])
     boxes, labels, masks = DefectDetector.predict(processed_image, model)
 
-    # ✅ 정상 이미지 처리 추가
-    if len(boxes) == 0:
-        st.image(processed_image, caption=f"✅ 정상 이미지: {selected_file}", use_container_width=True)
-        st.write("✅ **정상입니다! 결함이 탐지되지 않았습니다.**")
-    else:
-        # ✅ 시각화 결과 적용
+    # ✅ JSON 데이터 저장 (결과가 없는 경우도 포함)
+    add_to_json_results(selected_file, boxes, labels)
+
+    # ✅ 결과가 있을 경우 시각화
+    if len(boxes) > 0:
         result_image = Visualizer.visualize(processed_image, boxes, labels, masks, mask_display, mask_alpha, line_thickness, contour_thickness)
         st.image(result_image, caption=f"결과: {selected_file}", use_container_width=True)
-
-    # ✅ 결함 정보 표시 (아이콘 추가 + `lightgray` 배경)
-    st.write(f"📌 **파일명:** {selected_file}")
-    if len(labels) > 0:
-        defect_summary = ""
-        for defect in set(labels):
-            defect_name = CLASS_NAMES[int(defect)]
-            defect_count = list(labels).count(defect)
-            icon = ICON_MAPPING.get(defect_name, "❓")
-            defect_summary += f'<div style="background-color: lightgray; padding: 5px; border-radius: 5px; margin-bottom: 5px;">{icon} <b>{defect_name}</b>: {defect_count}개</div>'
-        st.markdown(defect_summary, unsafe_allow_html=True)
     else:
-        st.write("✅ **정상입니다**")
+        st.image(processed_image, caption=f"✅ 정상 이미지: {selected_file}", use_container_width=True)
+        st.write("✅ **정상입니다! 결함이 탐지되지 않았습니다.**")
+
+    # ✅ JSON 저장 및 다운로드 버튼 추가
+    if st.button("📥 JSON 저장 및 다운로드"):
+        json_path = "results.json"
+        with open(json_path, "w") as json_file:
+            json.dump(json_results, json_file, indent=4)
+
+        # ✅ JSON 다운로드 버튼 추가
+        with open(json_path, "rb") as file:
+            st.download_button(
+                label="📥 JSON 파일 다운로드",
+                data=file,
+                file_name="results.json",
+                mime="application/json"
+            )
+
+        st.success("📁 JSON 파일이 저장 및 다운로드되었습니다!")
 
 # 완벽한 모델
