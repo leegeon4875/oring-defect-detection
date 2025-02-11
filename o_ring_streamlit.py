@@ -195,21 +195,14 @@ if uploaded_files:
         st.image(result_image, caption=f"결과: {selected_file}", use_container_width=True)
 
     # ✅ 결함 정보 표시 (아이콘 추가 + `lightgray` 배경)
+    st.write(f"📌 **파일명:** {selected_file}")
     if len(labels) > 0:
         defect_summary = ""
-        for i, (label, score) in enumerate(zip(labels, scores)):  # 신뢰도(score) 함께 가져오기
-            defect_name = CLASS_NAMES[int(label)]
-            defect_count = list(labels).count(label)
+        for defect in set(labels):
+            defect_name = CLASS_NAMES[int(defect)]
+            defect_count = list(labels).count(defect)
             icon = ICON_MAPPING.get(defect_name, "❓")
-            
-            # ✅ 신뢰도 추가 표시
-            defect_summary += f'''
-                <div style="background-color: lightgray; padding: 5px; border-radius: 5px; margin-bottom: 5px;">
-                    {icon} <b>{defect_name}</b>: {defect_count}개  
-                    <span style="color: darkblue;">(신뢰도: {score:.2%})</span>
-                </div>
-            '''
-        
+            defect_summary += f'<div style="background-color: lightgray; padding: 5px; border-radius: 5px; margin-bottom: 5px;">{icon} <b>{defect_name}</b>: {defect_count}개</div>'
         st.markdown(defect_summary, unsafe_allow_html=True)
     else:
         st.write("✅ **정상입니다**")
