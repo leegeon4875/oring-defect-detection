@@ -135,7 +135,7 @@ class Visualizer:
                     m = (m * 255).astype(np.uint8)
 
                 # ✅ 마스크 이진화 (Threshold 조정)
-                m = (m > 0.4).astype(np.uint8) * 255  # 기존 0.5 → 0.4로 낮춤 (너무 넓어지는 문제 방지)
+                m = (m > 0.5).astype(np.uint8) * 255  # 기존 0.5 → 0.4로 낮춤 (너무 넓어지는 문제 방지)
 
                 # ✅ 경계 다듬기 (Morphological Closing 적용)
                 kernel = np.ones((3, 3), np.uint8)  # 3x3 작은 커널 사용
@@ -206,31 +206,31 @@ class Visualizer:
 
         return Image.fromarray(output)
 
-# ✅ JSON 데이터를 저장할 리스트 생성 (결과를 확인한 이미지만 저장)
+# ✅ JSON 데이터를 저장할 리스트 생성
 json_results = []
 
-# ✅ JSON 데이터 변환 함수 (결과 확인된 이미지만 저장)
+# ✅ JSON 데이터 변환 함수 (정상 이미지도 포함)
 def add_to_json_results(file_name, boxes, labels, scores):
     """결과 데이터를 JSON 형식으로 변환 후 리스트에 추가"""
     results = []
     for i in range(len(labels)):
         result = {
             "class": CLASS_NAMES.get(int(labels[i]), "unknown"),
-            "confidence": float(scores[i]),  
-            "bounding_box": [float(coord) for coord in boxes[i]]  
+            "confidence": float(scores[i]),  # ✅ 확률(score) 추가
+            "bounding_box": [float(coord) for coord in boxes[i]]
         }
         results.append(result)
 
     json_data = {
         "file_name": file_name,
-        "detections": results
+        "detections": results  # 결함이 없으면 빈 리스트 []
     }
 
-    # ✅ 중복 저장 방지 (이미 존재하는 파일은 업데이트)
+    # ✅ 중복 저장 방지 (같은 이미지 여러 번 저장되지 않도록)
     existing_files = [item["file_name"] for item in json_results]
     if file_name not in existing_files:
         json_results.append(json_data)
-        
+
 # ✅ UI 구성
 st.title("O-Ring Defect Detection")
 model_option = st.selectbox("사용할 모델 선택", list(MODEL_PATHS.keys()))
@@ -252,10 +252,12 @@ if uploaded_files:
     image = Image.open(file_dict[selected_file]).convert("RGB")
     processed_image = ImageProcessor.preprocess_image(image)  
     model = DefectDetector.load_model(MODEL_PATHS[model_option])
-    boxes, labels, masks = DefectDetector.predict(processed_image, model)
+    
+    # ✅ 예측 수행 (scores 값 추가)
+    boxes, labels, scores = DefectDetector.predict(processed_image, model)
 
     # ✅ JSON 데이터 저장 (결과가 없는 경우도 포함)
-    add_to_json_results(selected_file, boxes, labels)
+    add_to_json_results(selected_file, boxes, labels, scores)
 
     # ✅ 결과가 있을 경우 시각화
     if len(boxes) > 0:
@@ -265,7 +267,10 @@ if uploaded_files:
         st.image(processed_image, caption=f"✅ 정상 이미지: {selected_file}", use_container_width=True)
         st.write("✅ **정상입니다! 결함이 탐지되지 않았습니다.**")
 
-    # ✅ JSON 저장 및 다운로드 버튼 추가
+# ✅ JSON 저장 및 다운로드 버튼 (항상 표시되도록 변경)
+if json_results:
+    st.write("📥 **결과를 저장하고 다운로드할 수 있습니다.**")
+    
     if st.button("📥 JSON 저장 및 다운로드"):
         json_path = "results.json"
         with open(json_path, "w") as json_file:
