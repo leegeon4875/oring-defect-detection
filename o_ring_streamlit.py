@@ -93,7 +93,7 @@ class DefectDetector:
             scores = outputs[0]['scores'].detach().numpy()
             boxes = outputs[0]['boxes'].detach().numpy()
             labels = outputs[0]['labels'].detach().numpy()
-             masks = outputs[0]['masks'].detach().numpy() if "masks" in outputs[0] else None
+            masks = outputs[0]['masks'].detach().numpy() if "masks" in outputs[0] else None
 
             # ✅ 디버깅용: 마스크 확인
             print("🔍 예측된 마스크 개수:", len(masks) if masks is not None else "None")
@@ -104,15 +104,15 @@ class DefectDetector:
             threshold = 0.5
             selected = np.where(scores >= threshold)[0]
 
-            # ✅ 결함이 없는 경우 빈 리스트 반환 (오류 방지)
             if len(selected) == 0:
                 return [], [], []
 
-            return boxes[selected], labels[selected], masks[selected]
+            return boxes[selected], labels[selected], masks[selected] if masks is not None else []
 
         except Exception as e:
             st.error(f"❌ 예측 중 오류 발생: {str(e)}")
-            return [], [], []  # ✅ 오류 발생 시에도 빈 리스트 반환
+            return [], [], []
+
 
 # ✅ 시각화 클래스 추가
 class Visualizer:
