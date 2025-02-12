@@ -8,6 +8,7 @@ from PIL import Image
 import torchvision.models as models
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 import json
+import io
 
 # ✅ 모델 경로 설정
 MODEL_PATHS = {
@@ -217,6 +218,19 @@ if uploaded_files:
     if len(boxes) > 0:
         result_image = Visualizer.visualize(processed_image, boxes, labels, masks, mask_display, mask_alpha, line_thickness, contour_thickness)
         st.image(result_image, caption=f"결과: {selected_file}", use_container_width=True)
+            # ✅ 이미지 데이터를 Bytes로 변환
+        img_byte_arr = io.BytesIO()
+        result_image.save(img_byte_arr, format="PNG")
+        img_byte_arr = img_byte_arr.getvalue()
+
+        # ✅ Streamlit 다운로드 버튼 생성
+        st.download_button(
+            label="📷 시각화된 이미지 다운로드",
+            data=img_byte_arr,
+            file_name=f"{selected_file}_result.png",
+            mime="image/png"
+        )
+        
     else:
         st.image(processed_image, caption=f"✅ 정상 이미지: {selected_file}", use_container_width=True)
         st.write("✅ **정상입니다! 결함이 탐지되지 않았습니다.**")
