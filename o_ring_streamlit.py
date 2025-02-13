@@ -224,7 +224,7 @@ if uploaded_files:
             defect_counts[class_name] = defect_counts.get(class_name, 0) + 1
 
         # ✅ 신뢰도(Confidence) 평균값 계산
-        scores = model(processed_image.unsqueeze(0))[0]['scores'].detach().numpy()
+        scores = model(F.to_tensor(processed_image).unsqueeze(0))[0]['scores'].detach().numpy()
         avg_confidence = np.mean(scores) if len(scores) > 0 else 0
                         
         # ✅ 탐지된 결함 정보 표시
