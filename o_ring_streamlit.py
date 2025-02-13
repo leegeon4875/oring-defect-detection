@@ -233,7 +233,7 @@ if uploaded_files:
         avg_confidence = np.mean(filtered_scores) if len(filtered_scores) > 0 else 0
                         
         # ✅ 탐지된 결함 정보 표시
-        st.write(f"📊 **탐지된 결함 요약 ({selected_file})**")
+        st.write(f"📊 **탐지된 결함 요약 : {selected_file}**")
         for defect, count in defect_counts.items():
             st.write(f"- {ICON_MAPPING.get(defect, '')} **{defect}**: {count}개")
         st.write(f"🔍 **평균 신뢰도:** {avg_confidence:.2f}")   
