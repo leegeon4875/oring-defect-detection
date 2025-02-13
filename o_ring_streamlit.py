@@ -183,10 +183,8 @@ def add_to_json_results(file_name, boxes, labels):
         "detections": results  # 결함이 없으면 빈 리스트 []
     }
 
-    # ✅ 중복 저장 방지 (같은 이미지 여러 번 저장되지 않도록)
-    existing_files = [item["file_name"] for item in json_results]
-    if file_name not in existing_files:
-        json_results.append(json_data)
+    # ✅ JSON 결과 리스트에 추가 (중복 방지)
+    json_results.append(json_data)
         
 # ✅ UI 구성
 st.title("O-Ring Defect Detection")
@@ -218,7 +216,24 @@ if uploaded_files:
     if len(boxes) > 0:
         result_image = Visualizer.visualize(processed_image, boxes, labels, masks, mask_display, mask_alpha, line_thickness, contour_thickness)
         st.image(result_image, caption=f"결과: {selected_file}", use_container_width=True)
-            # ✅ 이미지 데이터를 Bytes로 변환
+        
+        # ✅ 탐지된 결함 정보 요약
+        defect_counts = {}
+        for label in labels:
+            class_name = CLASS_NAMES.get(int(label), "unknown")
+            defect_counts[class_name] = defect_counts.get(class_name, 0) + 1
+
+        # ✅ 신뢰도(Confidence) 평균값 계산
+        scores = model(processed_image.unsqueeze(0))[0]['scores'].detach().numpy()
+        avg_confidence = np.mean(scores) if len(scores) > 0 else 0
+                        
+        # ✅ 탐지된 결함 정보 표시
+        st.write(f"📊 **탐지된 결함 요약 ({selected_file})**")
+        for defect, count in defect_counts.items():
+            st.write(f"- {ICON_MAPPING.get(defect, '')} **{defect}**: {count}개")
+        st.write(f"🔍 **평균 신뢰도:** {avg_confidence:.2f}")   
+             
+        # ✅ 이미지 데이터를 Bytes로 변환
         img_byte_arr = io.BytesIO()
         result_image.save(img_byte_arr, format="PNG")
         img_byte_arr = img_byte_arr.getvalue()
@@ -237,7 +252,7 @@ if uploaded_files:
 
 # ✅ JSON 저장 및 다운로드 버튼 추가 (JSON 데이터가 있을 때만 표시)
 if json_results:
-    st.write("📥 **결과를 저장하고 다운로드할 수 있습니다.**")
+    st.write("📥 **업로드한 이미지들의 결과를 JSON 파일로 저장할 수 있습니다.**")
     
     if st.button("📥 JSON 저장 및 다운로드"):
         json_path = "results.json"
