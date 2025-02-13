@@ -87,33 +87,35 @@ class DefectDetector:
         try:
             # ✅ 이미지 변환 (PIL → Tensor)
             image_tensor = F.to_tensor(image).unsqueeze(0)
-            
-            # 신뢰도 임계값 (Threshold) 설정
-            confidence_threshold = 0.5
 
             # ✅ 모델 예측 실행
             with torch.no_grad():
                 outputs = model(image_tensor)
 
+            # ✅ 신뢰도 임계값 설정 (Threshold)
+            confidence_threshold = 0.5
+            
+            # ✅ 예측 결과 추출
             scores = outputs[0]['scores'].detach().numpy() if 'scores' in outputs[0] else []
-            filtered_scores = [s for s in scores if s >= confidence_threshold]
+            filtered_scores = [s for s in scores if s >= confidence_threshold]  # 필터링된 신뢰도
+            
             boxes = outputs[0]['boxes'].detach().numpy()
             labels = outputs[0]['labels'].detach().numpy()
             masks = outputs[0]['masks'].detach().squeeze().numpy()
 
             # ✅ 예측 결과 필터링 (신뢰도 0.5 이상만)
-            threshold = 0.5
-            selected = np.where(scores >= threshold)[0]
+            selected = np.where(scores >= confidence_threshold)[0]
 
             # ✅ 결함이 없는 경우 빈 리스트 반환 (오류 방지)
             if len(selected) == 0:
-                return [], [], []
+                return [], [], [], []
 
-            return boxes[selected], labels[selected], masks[selected]
+            return boxes[selected], labels[selected], masks[selected], filtered_scores  # ✅ 신뢰도 리스트 반환
 
         except Exception as e:
             st.error(f"❌ 예측 중 오류 발생: {str(e)}")
-            return [], [], []  # ✅ 오류 발생 시에도 빈 리스트 반환
+            return [], [], [], []  # ✅ 오류 발생 시에도 빈 리스트 반환
+
 
 # ✅ 시각화 클래스 추가
 class Visualizer:
@@ -211,7 +213,7 @@ if uploaded_files:
     image = Image.open(file_dict[selected_file]).convert("RGB")
     processed_image = ImageProcessor.preprocess_image(image)  
     model = DefectDetector.load_model(MODEL_PATHS[model_option])
-    boxes, labels, masks = DefectDetector.predict(processed_image, model)
+    boxes, labels, masks, filtered_scores = DefectDetector.predict(processed_image, model)
 
     # ✅ JSON 데이터 저장 (결과가 없는 경우도 포함)
     add_to_json_results(selected_file, boxes, labels)
@@ -228,8 +230,7 @@ if uploaded_files:
             defect_counts[class_name] = defect_counts.get(class_name, 0) + 1
 
         # ✅ 신뢰도(Confidence) 평균값 계산
-        scores = model(F.to_tensor(processed_image).unsqueeze(0))[0]['scores'].detach().numpy()
-        avg_confidence = np.mean(filtered_scores) if len(scores) > 0 else 0
+        avg_confidence = np.mean(filtered_scores) if len(filtered_scores) > 0 else 0
                         
         # ✅ 탐지된 결함 정보 표시
         st.write(f"📊 **탐지된 결함 요약 ({selected_file})**")
