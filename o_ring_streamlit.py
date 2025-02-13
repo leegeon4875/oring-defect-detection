@@ -87,12 +87,16 @@ class DefectDetector:
         try:
             # ✅ 이미지 변환 (PIL → Tensor)
             image_tensor = F.to_tensor(image).unsqueeze(0)
+            
+            # 신뢰도 임계값 (Threshold) 설정
+            confidence_threshold = 0.5
 
             # ✅ 모델 예측 실행
             with torch.no_grad():
                 outputs = model(image_tensor)
 
-            scores = outputs[0]['scores'].detach().numpy()
+            scores = outputs[0]['scores'].detach().numpy() if 'scores' in outputs[0] else []
+            filtered_scores = [s for s in scores if s >= confidence_threshold]
             boxes = outputs[0]['boxes'].detach().numpy()
             labels = outputs[0]['labels'].detach().numpy()
             masks = outputs[0]['masks'].detach().squeeze().numpy()
@@ -225,7 +229,7 @@ if uploaded_files:
 
         # ✅ 신뢰도(Confidence) 평균값 계산
         scores = model(F.to_tensor(processed_image).unsqueeze(0))[0]['scores'].detach().numpy()
-        avg_confidence = np.mean(scores) if len(scores) > 0 else 0
+        avg_confidence = np.mean(filtered_scores) if len(scores) > 0 else 0
                         
         # ✅ 탐지된 결함 정보 표시
         st.write(f"📊 **탐지된 결함 요약 ({selected_file})**")
